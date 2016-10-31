@@ -4,6 +4,9 @@
 #include "stdafx.h"
 
 #include <list>
+#include <algorithm>
+#include <vector>
+#include <cassert>
 
 #include "Types.h"
 #include "GenerateGeometry.h"
@@ -11,7 +14,7 @@
 namespace MeshShortestPath {
 
 	template <typename T>
-	static void iterateHalfedges(Polyhedron::Facet_const_handle facet, T callback) {
+	static void iterateHalfedges(Polyhedron::Facet_handle facet, T callback) {
 		auto halfedge = facet->halfedge();
 		auto halfedge2 = halfedge;
 		do {
@@ -20,9 +23,9 @@ namespace MeshShortestPath {
 		} while (halfedge2 != halfedge);
 	}
 
-	static Polyhedron::Point middlePoint(const Polyhedron::Facet_const_handle facet) {
+	static Polyhedron::Point middlePoint(const Polyhedron::Facet_handle facet) {
 		std::vector<Polyhedron::Point> points;
-		iterateHalfedges(facet, [&](Polyhedron::Halfedge_const_handle halfedge) {
+		iterateHalfedges(facet, [&](Polyhedron::Halfedge_handle halfedge) {
 			points.emplace_back(halfedge->vertex()->point());
 		});
 		Polyhedron::Point result(0, 0, 0);
@@ -34,14 +37,18 @@ namespace MeshShortestPath {
 
 	class MMP {
 	public:
-		MMP(const Polyhedron& polyhedron, Polyhedron::Facet_const_handle initialFacet, Polyhedron::Point pointOnInitialFacet) : polyhedron(polyhedron) {
-			iterateHalfedges(initialFacet, [&](Polyhedron::Halfedge_const_handle halfedge) {
-				//halfedge->insertInterval(CandidateInterval(halfedgeLength(halfedge), pointOnStartFace));
+		MMP(const Polyhedron& polyhedron, Polyhedron::Facet_handle initialFacet, Polyhedron::Point pointOnInitialFacet) : polyhedron(polyhedron) {
+			iterateHalfedges(initialFacet, [&](Polyhedron::Halfedge_handle halfedge) {
+				CandidateInterval interval(halfedge, pointOnInitialFacet, pointOnInitialFacet, pointOnInitialFacet, 0, 0, 1);
+				candidateIntervals.emplace_back(std::move(interval));
+				auto iterator = candidateIntervals.end();
+				--iterator;
+				assert(&*iterator == &candidateIntervals.back());
+				halfedge->insertInterval(iterator);
 			});
 		}
 
 	private:
-
 		static Kernel::FT halfedgeLength(Polyhedron::Halfedge_handle halfedge) {
 			auto point0 = halfedge->vertex()->point();
 			auto point1 = halfedge->opposite()->vertex()->point();
@@ -51,13 +58,14 @@ namespace MeshShortestPath {
 
 		const Polyhedron polyhedron;
 		std::list<CandidateInterval> candidateIntervals;
+		std::vector<std::list<CandidateInterval>::iterator> eventHeap;
 	};
 
 }
 
 int main()
 {
-	auto polyhedron = MeshShortestPath::generateCube();
+	MeshShortestPath::Polyhedron polyhedron = MeshShortestPath::generateCube();
 	auto facet = polyhedron.facets_begin();
 	MeshShortestPath::MMP mmp(polyhedron, facet, middlePoint(facet));
     return 0;
