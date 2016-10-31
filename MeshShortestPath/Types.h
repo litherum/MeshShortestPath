@@ -75,11 +75,14 @@ namespace MeshShortestPath {
 			FrontierPoint,
 			EndPoint
 		};
+
 		Event(Type type, Kernel::Point_3 point, std::list<CandidateInterval>::iterator candidateInterval) :
 			type(type),
 			point(point),
 			candidateInterval(candidateInterval) {
 		}
+
+		Type getType() const { return type; }
 
 		bool operator<(const Event& event) const;
 

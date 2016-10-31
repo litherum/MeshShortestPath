@@ -53,7 +53,10 @@ namespace MeshShortestPath {
 
 		void populate() {
 			while (!eventQueue.empty()) {
-				eventQueue.remove(); // FIXME: Implement this
+				auto event = eventQueue.remove();
+				if (event.getType() == Event::Type::FrontierPoint) {
+					// FIXME: Implement this
+				}
 			}
 		}
 
