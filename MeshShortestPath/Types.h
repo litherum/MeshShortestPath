@@ -42,33 +42,60 @@ namespace MeshShortestPath {
 
 	class CandidateInterval {
 	public:
-	CandidateInterval(
-		Polyhedron::Halfedge_const_handle halfedge,
-		Kernel::Point_3 root,
-		Kernel::Point_3 unfoldedRoot,
-		boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
-		Kernel::FT depth,
-		Kernel::FT leftExtent,
-		Kernel::FT rightExtent) :
-			halfedge(halfedge),
-			root(root),
-			unfoldedRoot(unfoldedRoot),
-			predecessor(predecessor),
-			depth(depth),
-			leftExtent(leftExtent),
-			rightExtent(rightExtent) {
-	}
+		CandidateInterval(
+			Polyhedron::Halfedge_const_handle halfedge,
+			Kernel::Point_3 root,
+			Kernel::Point_3 unfoldedRoot,
+			boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
+			Kernel::FT depth,
+			Kernel::FT leftExtent,
+			Kernel::FT rightExtent);
+
+		Kernel::Point_3 getUnfoldedRoot() const { return unfoldedRoot; }
+		Kernel::FT getDepth() const { return depth; }
+		Kernel::Point_3 getFrontierPoint() const { return frontierPoint; }
+		Kernel::Point_3 getLeftExtent() const;
+		Kernel::Point_3 getRightExtent() const;
 
 	private:
-	Polyhedron::Halfedge_const_handle halfedge;
-	Kernel::Point_3 root;
-	Kernel::Point_3 unfoldedRoot;
-	Kernel::Point_3 frontierPoint;
-	Kernel::Point_3 accessPoint;
-	boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor;
-	Kernel::FT depth;
-	Kernel::FT leftExtent;
-	Kernel::FT rightExtent;
+		Polyhedron::Halfedge_const_handle halfedge;
+		Kernel::Point_3 root;
+		Kernel::Point_3 unfoldedRoot;
+		Kernel::Point_3 frontierPoint;
+		Kernel::Point_3 accessPoint;
+		boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor;
+		Kernel::FT depth;
+		Kernel::FT leftExtent;
+		Kernel::FT rightExtent;
 	};
 
+	class Event {
+	public:
+		enum class Type {
+			FrontierPoint,
+			EndPoint
+		};
+		Event(Type type, Kernel::Point_3 point, std::list<CandidateInterval>::iterator candidateInterval) :
+			type(type),
+			point(point),
+			candidateInterval(candidateInterval) {
+		}
+
+		bool operator<(const Event& event) const;
+
+	private:
+		Type type;
+		Kernel::Point_3 point;
+		std::list<CandidateInterval>::iterator candidateInterval;
+	};
+
+	class EventQueue {
+	public:
+		void place(Event);
+		Event remove();
+		bool empty() const;
+
+	private:
+		std::vector<Event> heap;
+	};
 }

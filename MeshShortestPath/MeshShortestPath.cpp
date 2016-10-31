@@ -45,7 +45,16 @@ namespace MeshShortestPath {
 				--iterator;
 				assert(&*iterator == &candidateIntervals.back());
 				halfedge->insertInterval(iterator);
+				eventQueue.place(Event(Event::Type::FrontierPoint, iterator->getFrontierPoint(), iterator));
+				eventQueue.place(Event(Event::Type::EndPoint, iterator->getLeftExtent(), iterator));
+				eventQueue.place(Event(Event::Type::EndPoint, iterator->getRightExtent(), iterator));
 			});
+		}
+
+		void populate() {
+			while (!eventQueue.empty()) {
+				eventQueue.remove(); // FIXME: Implement this
+			}
 		}
 
 	private:
@@ -58,7 +67,7 @@ namespace MeshShortestPath {
 
 		const Polyhedron polyhedron;
 		std::list<CandidateInterval> candidateIntervals;
-		std::vector<std::list<CandidateInterval>::iterator> eventHeap;
+		EventQueue eventQueue;
 	};
 
 }
@@ -68,6 +77,7 @@ int main()
 	MeshShortestPath::Polyhedron polyhedron = MeshShortestPath::generateCube();
 	auto facet = polyhedron.facets_begin();
 	MeshShortestPath::MMP mmp(polyhedron, facet, middlePoint(facet));
+	mmp.populate();
     return 0;
 }
 
