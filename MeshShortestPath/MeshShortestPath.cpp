@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <vector>
 #include <cassert>
+#include <memory>
 
 #include "Types.h"
 #include "GenerateGeometry.h"
@@ -37,7 +38,8 @@ namespace MeshShortestPath {
 
 	class MMP {
 	public:
-		MMP(const Polyhedron& polyhedron, Polyhedron::Facet_handle initialFacet, Polyhedron::Point pointOnInitialFacet) : polyhedron(polyhedron) {
+		// FIXME: The input can either be a point on the interior of a triangle, a point on the interior of an edge, or a vertex.
+		MMP(Polyhedron&& polyhedron, Polyhedron::Facet_handle initialFacet, Polyhedron::Point pointOnInitialFacet) : polyhedron(std::move(polyhedron)) {
 			iterateHalfedges(initialFacet, [&](Polyhedron::Halfedge_handle halfedge) {
 				CandidateInterval interval(halfedge, pointOnInitialFacet, pointOnInitialFacet, pointOnInitialFacet, 0, 0, 1);
 				candidateIntervals.emplace_back(std::move(interval));
@@ -45,17 +47,16 @@ namespace MeshShortestPath {
 				--iterator;
 				assert(&*iterator == &candidateIntervals.back());
 				halfedge->insertInterval(iterator);
-				eventQueue.place(Event(Event::Type::FrontierPoint, iterator->getFrontierPoint(), iterator));
-				eventQueue.place(Event(Event::Type::EndPoint, iterator->getLeftExtent(), iterator));
-				eventQueue.place(Event(Event::Type::EndPoint, iterator->getRightExtent(), iterator));
+				eventQueue.place(std::make_unique<FrontierPointEvent>(iterator->getFrontierPoint(), iterator));
+				eventQueue.place(std::make_unique<EndPointEvent>(halfedge->vertex()->point(), *iterator));
 			});
 		}
 
 		void populate() {
 			while (!eventQueue.empty()) {
-				auto event = eventQueue.remove();
-				if (event.getType() == Event::Type::FrontierPoint) {
-					// FIXME: Implement this
+				auto e = eventQueue.remove();
+				if (FrontierPointEvent* event = dynamic_cast<FrontierPointEvent*>(e.get())) {
+
 				}
 			}
 		}
@@ -68,7 +69,7 @@ namespace MeshShortestPath {
 			return std::sqrt(displacement.squared_length());
 		}
 
-		const Polyhedron polyhedron;
+		Polyhedron polyhedron;
 		std::list<CandidateInterval> candidateIntervals;
 		EventQueue eventQueue;
 	};
@@ -79,7 +80,7 @@ int main()
 {
 	MeshShortestPath::Polyhedron polyhedron = MeshShortestPath::generateCube();
 	auto facet = polyhedron.facets_begin();
-	MeshShortestPath::MMP mmp(polyhedron, facet, middlePoint(facet));
+	MeshShortestPath::MMP mmp(std::move(polyhedron), facet, middlePoint(facet));
 	mmp.populate();
     return 0;
 }

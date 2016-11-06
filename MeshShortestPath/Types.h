@@ -2,6 +2,7 @@
 
 #include <list>
 #include <vector>
+#include <memory>
 
 #define CGAL_CHECK_EXPENSIVE
 #include <CGAL/Simple_cartesian.h>
@@ -69,36 +70,46 @@ namespace MeshShortestPath {
 		Kernel::FT rightExtent;
 	};
 
+	// FIXME: Use variants instead to avoid allocations
 	class Event {
 	public:
-		enum class Type {
-			FrontierPoint,
-			EndPoint
-		};
+		virtual Kernel::FT getLabel() const = 0;
+	};
 
-		Event(Type type, Kernel::Point_3 point, std::list<CandidateInterval>::iterator candidateInterval) :
-			type(type),
-			point(point),
-			candidateInterval(candidateInterval) {
+	class FrontierPointEvent : public Event {
+	public:
+		FrontierPointEvent(Kernel::Point_3 point, std::list<CandidateInterval>::iterator candidateInterval) : point(point), candidateInterval(candidateInterval) {
 		}
 
-		Type getType() const { return type; }
-
-		bool operator<(const Event& event) const;
-
 	private:
-		Type type;
+		Kernel::FT getLabel() const override;
+
 		Kernel::Point_3 point;
 		std::list<CandidateInterval>::iterator candidateInterval;
 	};
 
-	class EventQueue {
+	class EndPointEvent : public Event {
 	public:
-		void place(Event);
-		Event remove();
-		bool empty() const;
+		EndPointEvent(Kernel::Point_3 point, const CandidateInterval& candidateInterval);
 
 	private:
-		std::vector<Event> heap;
+		Kernel::FT getLabel() const override {
+			return label;
+		}
+
+		Kernel::Point_3 point;
+		Kernel::FT label;
+	};
+
+	class EventQueue {
+	public:
+		void place(std::unique_ptr<Event>&&);
+		std::unique_ptr<Event> remove();
+		bool empty() const {
+			return heap.empty();
+		}
+
+	private:
+		std::vector<std::unique_ptr<Event>> heap;
 	};
 }

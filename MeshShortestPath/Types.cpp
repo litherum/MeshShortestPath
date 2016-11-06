@@ -60,31 +60,34 @@ namespace MeshShortestPath {
 		return source + rightExtent * s;
 	}
 
-	bool Event::operator<(const Event& other) const {
-		auto computeDistance = [](const Event& event) {
-			auto point = event.point;
-			auto unfoldedRoot = event.candidateInterval->getUnfoldedRoot();
-			Kernel::Vector_3 displacement(point.x() - unfoldedRoot.x(), point.y() - unfoldedRoot.y(), point.z() - unfoldedRoot.z());
-			return std::sqrt(displacement.squared_length()) + event.candidateInterval->getDepth();
-		};
-		auto distance0 = computeDistance(*this);
-		auto distance1 = computeDistance(other);
-		return distance0 < distance1;
+	// Precondition: Point is part of the candidate interval.
+	static Kernel::FT computeLabel(Kernel::Point_3 point, const CandidateInterval& candidateInterval) {
+		auto unfoldedRoot = candidateInterval.getUnfoldedRoot();
+		Kernel::Vector_3 displacement(point.x() - unfoldedRoot.x(), point.y() - unfoldedRoot.y(), point.z() - unfoldedRoot.z());
+		return std::sqrt(displacement.squared_length()) + candidateInterval.getDepth();
 	}
 
-	void EventQueue::place(Event event) {
-		heap.push_back(event);
-		std::push_heap(heap.begin(), heap.end());
+	Kernel::FT FrontierPointEvent::getLabel() const {
+		return computeLabel(point, *candidateInterval);
 	}
 
-	Event EventQueue::remove() {
-		std::pop_heap(heap.begin(), heap.end());
-		Event result = heap.back();
+	EndPointEvent::EndPointEvent(Kernel::Point_3 point, const CandidateInterval& candidateInterval) : label(computeLabel(point, candidateInterval)) {
+	}
+
+	static bool eventComparison(const std::unique_ptr<Event>& a, const std::unique_ptr<Event>& b) {
+		return a->getLabel() < b->getLabel();
+	}
+
+	void EventQueue::place(std::unique_ptr<Event>&& event) {
+		heap.emplace_back(std::move(event));
+		std::push_heap(heap.begin(), heap.end(), &eventComparison);
+	}
+
+	std::unique_ptr<Event> EventQueue::remove() {
+		std::pop_heap(heap.begin(), heap.end(), &eventComparison);
+		std::unique_ptr<Event> result = std::move(heap.back());
+		assert(heap.back() == nullptr);
 		heap.pop_back();
 		return result;
-	}
-
-	bool EventQueue::empty() const {
-		return heap.empty();
 	}
 }
