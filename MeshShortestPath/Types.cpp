@@ -6,9 +6,10 @@
 
 namespace MeshShortestPath {
 
-	void insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals) {
+	bool insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals) {
 		// FIXME: Implement this
 		intervals.push_back(interval);
+		return true;
 	}
 
 	CandidateInterval::CandidateInterval(
@@ -26,23 +27,26 @@ namespace MeshShortestPath {
 			depth(depth),
 			leftExtent(leftExtent),
 			rightExtent(rightExtent) {
+		assert(leftExtent <= rightExtent);
+		assert(leftExtent >= 0);
+		assert(rightExtent <= 1);
 		auto destination = halfedge->vertex()->point();
 		auto source = halfedge->opposite()->vertex()->point();
 		// Project unfoldedRoot onto the line from source to destination
-		Kernel::Vector_3 v(unfoldedRoot.x() - source.x(), unfoldedRoot.y() - source.y(), unfoldedRoot.z() - source.z());
-		Kernel::Vector_3 s(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
-		auto projectionFraction = (v * s) / (s * s);
-		bool frontierPointIsLeftExtent = false;
-		bool frontierPointIsRightExtent = false;
+		Kernel::Vector_3 a(unfoldedRoot.x() - source.x(), unfoldedRoot.y() - source.y(), unfoldedRoot.z() - source.z());
+		Kernel::Vector_3 b(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
+		auto projectionFraction = (a * b) / (b * b);
+
+		// FIXME: Provide some more resilient way to test for frontier points coincident with vertices
 		if (projectionFraction <= leftExtent) {
 			projectionFraction = leftExtent;
-			frontierPointIsLeftExtent = true;
+			frontierPointIsAtExtent = true;
 		}
 		else if (projectionFraction >= rightExtent) {
 			projectionFraction = rightExtent;
-			frontierPointIsRightExtent = true;
+			frontierPointIsAtExtent = true;
 		}
-		frontierPoint = source + projectionFraction * s;
+		frontierPoint = source + projectionFraction * b;
 		// FIXME: calculate accessPoint by intersecting a line between frontierPoint and unfoldedRoot with the other edges of the facet.
 	}
 
@@ -75,7 +79,7 @@ namespace MeshShortestPath {
 	}
 
 	static bool eventComparison(const std::unique_ptr<Event>& a, const std::unique_ptr<Event>& b) {
-		return a->getLabel() < b->getLabel();
+		return a->getLabel() > b->getLabel();
 	}
 
 	void EventQueue::place(std::unique_ptr<Event>&& event) {

@@ -56,6 +56,7 @@ namespace MeshShortestPath {
 					std::cout << ", ";
 				printPoint(std::cout, point);
 			}
+			std::cout << std::endl;
 
 			iterateHalfedges(initialFacet, [&](Polyhedron::Halfedge_handle halfedge) {
 				CandidateInterval interval(halfedge, pointOnInitialFacet, pointOnInitialFacet, 0, 0, 1);
@@ -63,7 +64,8 @@ namespace MeshShortestPath {
 				std::list<CandidateInterval>::iterator iterator = candidateIntervals.end();
 				--iterator;
 				assert(&*iterator == &candidateIntervals.back());
-				halfedge->insertInterval(iterator);
+				bool firstOrLastOnHalfedge = halfedge->insertInterval(iterator);
+				iterator->setFrontierPointIsAtVertex(iterator->getFrontierPointIsAtExtent() && firstOrLastOnHalfedge);
 				eventQueue.place(std::make_unique<FrontierPointEvent>(iterator->getFrontierPoint(), iterator));
 				eventQueue.place(std::make_unique<EndPointEvent>(halfedge->vertex()->point(), *iterator));
 			});
@@ -72,9 +74,10 @@ namespace MeshShortestPath {
 		void populate() {
 			while (!eventQueue.empty()) {
 				std::unique_ptr<Event> e = eventQueue.remove();
+				std::cout << "Encountering event with label " << e->getLabel() << std::endl;
 				if (FrontierPointEvent* event = dynamic_cast<FrontierPointEvent*>(e.get())) {
 					// FIXME: Possibly permanently label the event
-					// FIXME: Do propagate(event->getCandidateInterval())
+					propagate(*event->getCandidateInterval());
 				}
 				else if (EndPointEvent* event = dynamic_cast<EndPointEvent*>(e.get())) {
 					// FIXME: Possibly permanently label the event
@@ -90,6 +93,10 @@ namespace MeshShortestPath {
 		}
 
 	private:
+		void propagate(const CandidateInterval&) {
+
+		}
+
 		Polyhedron& polyhedron;
 		std::list<CandidateInterval> candidateIntervals;
 		EventQueue eventQueue;

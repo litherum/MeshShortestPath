@@ -18,13 +18,13 @@ namespace MeshShortestPath {
 
 	class CandidateInterval;
 
-	void insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals);
+	bool insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals);
 
 	template <class Refs>
 	class HalfedgeWithIntervalVector : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 	public:
-		void insertInterval(std::list<CandidateInterval>::iterator interval) {
-			MeshShortestPath::insertInterval(interval, intervals);
+		bool insertInterval(std::list<CandidateInterval>::iterator interval) {
+			return MeshShortestPath::insertInterval(interval, intervals);
 		}
 
 		void clear() {
@@ -61,6 +61,9 @@ namespace MeshShortestPath {
 		Kernel::Point_3 getFrontierPoint() const { return frontierPoint; }
 		Kernel::Point_3 getLeftExtent() const;
 		Kernel::Point_3 getRightExtent() const;
+		bool getFrontierPointIsAtExtent() const { return frontierPointIsAtExtent; }
+		void setFrontierPointIsAtVertex(bool isAtVertex) { frontierPointIsAtVertex = isAtVertex; }
+		bool getFrontierPointIsAtVertex() const { return frontierPointIsAtVertex; }
 
 	private:
 		Polyhedron::Halfedge_handle halfedge;
@@ -72,6 +75,8 @@ namespace MeshShortestPath {
 		Kernel::FT depth;
 		Kernel::FT leftExtent;
 		Kernel::FT rightExtent;
+		bool frontierPointIsAtExtent { false };
+		bool frontierPointIsAtVertex { false };
 	};
 
 	// FIXME: Use variants instead to avoid allocations
