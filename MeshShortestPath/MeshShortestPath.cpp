@@ -93,8 +93,13 @@ namespace MeshShortestPath {
 		}
 
 	private:
-		void propagate(const CandidateInterval&) {
-
+		void propagate(const CandidateInterval& interval) {
+			if (interval.getFrontierPointIsAtVertex()) {
+				// FIXME: Find the vertex, then find opposite edges which are greater than 2*pi, then insertInteval()
+			}
+			else {
+				// FIXME: do project() and insertInterval()
+			}
 		}
 
 		Polyhedron& polyhedron;
