@@ -39,11 +39,11 @@ namespace MeshShortestPath {
 	class MMP {
 	public:
 		// FIXME: The input can either be a point on the interior of a triangle, a point on the interior of an edge, or a vertex.
-		MMP(Polyhedron&& polyhedron, Polyhedron::Facet_handle initialFacet, Polyhedron::Point pointOnInitialFacet) : polyhedron(std::move(polyhedron)) {
+		MMP(Polyhedron& polyhedron, Polyhedron::Facet_handle initialFacet, Polyhedron::Point pointOnInitialFacet) : polyhedron(polyhedron) {
 			iterateHalfedges(initialFacet, [&](Polyhedron::Halfedge_handle halfedge) {
-				CandidateInterval interval(halfedge, pointOnInitialFacet, pointOnInitialFacet, pointOnInitialFacet, 0, 0, 1);
+				CandidateInterval interval(halfedge, pointOnInitialFacet, pointOnInitialFacet, 0, 0, 1);
 				candidateIntervals.emplace_back(std::move(interval));
-				auto iterator = candidateIntervals.end();
+				std::list<CandidateInterval>::iterator iterator = candidateIntervals.end();
 				--iterator;
 				assert(&*iterator == &candidateIntervals.back());
 				halfedge->insertInterval(iterator);
@@ -54,10 +54,16 @@ namespace MeshShortestPath {
 
 		void populate() {
 			while (!eventQueue.empty()) {
-				auto e = eventQueue.remove();
+				std::unique_ptr<Event> e = eventQueue.remove();
 				if (FrontierPointEvent* event = dynamic_cast<FrontierPointEvent*>(e.get())) {
-
+					std::cout << "Found frontier point event." << std::endl;
 				}
+			}
+		}
+
+		~MMP() {
+			for (auto i = polyhedron.halfedges_begin(); i != polyhedron.halfedges_end(); ++i) {
+				i->clear();
 			}
 		}
 
@@ -69,7 +75,7 @@ namespace MeshShortestPath {
 			return std::sqrt(displacement.squared_length());
 		}
 
-		Polyhedron polyhedron;
+		Polyhedron& polyhedron;
 		std::list<CandidateInterval> candidateIntervals;
 		EventQueue eventQueue;
 	};
@@ -80,7 +86,7 @@ int main()
 {
 	MeshShortestPath::Polyhedron polyhedron = MeshShortestPath::generateCube();
 	auto facet = polyhedron.facets_begin();
-	MeshShortestPath::MMP mmp(std::move(polyhedron), facet, middlePoint(facet));
+	MeshShortestPath::MMP mmp(polyhedron, facet, middlePoint(facet));
 	mmp.populate();
     return 0;
 }

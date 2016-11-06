@@ -27,6 +27,10 @@ namespace MeshShortestPath {
 			MeshShortestPath::insertInterval(interval, intervals);
 		}
 
+		void clear() {
+			intervals.clear();
+		}
+
 	private:
 		std::vector<std::list<CandidateInterval>::iterator> intervals;
 	};
@@ -44,10 +48,10 @@ namespace MeshShortestPath {
 	class CandidateInterval {
 	public:
 		CandidateInterval(
-			Polyhedron::Halfedge_const_handle halfedge,
+			Polyhedron::Halfedge_handle halfedge,
 			Kernel::Point_3 root,
 			Kernel::Point_3 unfoldedRoot,
-			boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
+			//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
 			Kernel::FT depth,
 			Kernel::FT leftExtent,
 			Kernel::FT rightExtent);
@@ -59,12 +63,12 @@ namespace MeshShortestPath {
 		Kernel::Point_3 getRightExtent() const;
 
 	private:
-		Polyhedron::Halfedge_const_handle halfedge;
+		Polyhedron::Halfedge_handle halfedge;
 		Kernel::Point_3 root;
 		Kernel::Point_3 unfoldedRoot;
 		Kernel::Point_3 frontierPoint;
 		Kernel::Point_3 accessPoint;
-		boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor;
+		//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor;
 		Kernel::FT depth;
 		Kernel::FT leftExtent;
 		Kernel::FT rightExtent;
@@ -73,6 +77,7 @@ namespace MeshShortestPath {
 	// FIXME: Use variants instead to avoid allocations
 	class Event {
 	public:
+		virtual ~Event() { }
 		virtual Kernel::FT getLabel() const = 0;
 	};
 

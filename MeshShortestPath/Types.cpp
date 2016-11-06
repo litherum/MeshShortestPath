@@ -12,17 +12,17 @@ namespace MeshShortestPath {
 	}
 
 	CandidateInterval::CandidateInterval(
-		Polyhedron::Halfedge_const_handle halfedge,
+		Polyhedron::Halfedge_handle halfedge,
 		Kernel::Point_3 root,
 		Kernel::Point_3 unfoldedRoot,
-		boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
+		//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
 		Kernel::FT depth,
 		Kernel::FT leftExtent,
 		Kernel::FT rightExtent) :
 			halfedge(halfedge),
 			root(root),
 			unfoldedRoot(unfoldedRoot),
-			predecessor(predecessor),
+			//predecessor(predecessor),
 			depth(depth),
 			leftExtent(leftExtent),
 			rightExtent(rightExtent) {
