@@ -14,6 +14,10 @@
 
 namespace MeshShortestPath {
 
+	static void printPoint(std::ostream& stream, Polyhedron::Point point) {
+		stream << "(" << point.x() << ", " << point.y() << ", " << point.z() << ")";
+	}
+
 	template <typename T>
 	static void iterateHalfedges(Polyhedron::Facet_handle facet, T callback) {
 		auto halfedge = facet->halfedge();
@@ -40,6 +44,19 @@ namespace MeshShortestPath {
 	public:
 		// FIXME: The input can either be a point on the interior of a triangle, a point on the interior of an edge, or a vertex.
 		MMP(Polyhedron& polyhedron, Polyhedron::Facet_handle initialFacet, Polyhedron::Point pointOnInitialFacet) : polyhedron(polyhedron) {
+			std::vector<Polyhedron::Point> initialFacetPoints;
+			iterateHalfedges(initialFacet, [&](Polyhedron::Halfedge_handle halfedge) {
+				initialFacetPoints.push_back(halfedge->vertex()->point());
+			});
+			std::cout << "Starting with point ";
+			printPoint(std::cout, pointOnInitialFacet);
+			std::cout << " on facet ";
+			for (auto& point : initialFacetPoints) {
+				if (&point != &initialFacetPoints.front())
+					std::cout << ", ";
+				printPoint(std::cout, point);
+			}
+
 			iterateHalfedges(initialFacet, [&](Polyhedron::Halfedge_handle halfedge) {
 				CandidateInterval interval(halfedge, pointOnInitialFacet, pointOnInitialFacet, 0, 0, 1);
 				candidateIntervals.emplace_back(std::move(interval));
@@ -56,25 +73,23 @@ namespace MeshShortestPath {
 			while (!eventQueue.empty()) {
 				std::unique_ptr<Event> e = eventQueue.remove();
 				if (FrontierPointEvent* event = dynamic_cast<FrontierPointEvent*>(e.get())) {
-					std::cout << "Found frontier point event." << std::endl;
+					// FIXME: Possibly permanently label the event
+					// FIXME: Do propagate(event->getCandidateInterval())
+				}
+				else if (EndPointEvent* event = dynamic_cast<EndPointEvent*>(e.get())) {
+					// FIXME: Possibly permanently label the event
 				}
 			}
 		}
 
 		~MMP() {
+			// FIXME: Find some way to export the data
 			for (auto i = polyhedron.halfedges_begin(); i != polyhedron.halfedges_end(); ++i) {
 				i->clear();
 			}
 		}
 
 	private:
-		static Kernel::FT halfedgeLength(Polyhedron::Halfedge_handle halfedge) {
-			auto point0 = halfedge->vertex()->point();
-			auto point1 = halfedge->opposite()->vertex()->point();
-			Kernel::Vector_3 displacement(point1.x() - point0.x(), point1.y() - point0.y(), point1.z() - point0.z());
-			return std::sqrt(displacement.squared_length());
-		}
-
 		Polyhedron& polyhedron;
 		std::list<CandidateInterval> candidateIntervals;
 		EventQueue eventQueue;

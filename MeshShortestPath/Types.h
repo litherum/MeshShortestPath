@@ -86,6 +86,10 @@ namespace MeshShortestPath {
 		FrontierPointEvent(Kernel::Point_3 point, std::list<CandidateInterval>::iterator candidateInterval) : point(point), candidateInterval(candidateInterval) {
 		}
 
+		std::list<CandidateInterval>::iterator getCandidateInterval() const {
+			return candidateInterval;
+		}
+
 	private:
 		Kernel::FT getLabel() const override;
 
