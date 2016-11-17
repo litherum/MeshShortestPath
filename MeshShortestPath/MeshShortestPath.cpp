@@ -66,22 +66,15 @@ namespace MeshShortestPath {
 				assert(&*iterator == &candidateIntervals.back());
 				bool firstOrLastOnHalfedge = halfedge->insertInterval(iterator);
 				iterator->setFrontierPointIsAtVertex(iterator->getFrontierPointIsAtExtent() && firstOrLastOnHalfedge);
-				eventQueue.place(std::make_unique<FrontierPointEvent>(iterator->getFrontierPoint(), iterator));
-				eventQueue.place(std::make_unique<EndPointEvent>(halfedge->vertex()->point(), *iterator));
+				eventQueue.place(FrontierPointEvent(iterator->getFrontierPoint(), iterator));
+				eventQueue.place(EndPointEvent(halfedge->vertex()->point(), *iterator));
 			});
 		}
 
 		void populate() {
 			while (!eventQueue.empty()) {
-				std::unique_ptr<Event> e = eventQueue.remove();
-				std::cout << "Encountering event with label " << e->getLabel() << std::endl;
-				if (FrontierPointEvent* event = dynamic_cast<FrontierPointEvent*>(e.get())) {
-					// FIXME: Possibly permanently label the event
-					propagate(*event->getCandidateInterval());
-				}
-				else if (EndPointEvent* event = dynamic_cast<EndPointEvent*>(e.get())) {
-					// FIXME: Possibly permanently label the event
-				}
+				GenericEvent e = eventQueue.remove();
+				boost::apply_visitor(EventVisitor(*this), e);
 			}
 		}
 
@@ -93,6 +86,26 @@ namespace MeshShortestPath {
 		}
 
 	private:
+		class EventVisitor {
+		public:
+			EventVisitor(MMP& mmp) : mmp(mmp) {
+			}
+
+			void operator()(const FrontierPointEvent& event) const {
+				std::cout << "Encountering event with label " << event.getLabel() << std::endl;
+				// FIXME: Possibly label the event
+				mmp.propagate(*event.getCandidateInterval());
+			}
+
+			void operator()(const EndPointEvent& event) const {
+				std::cout << "Encountering event with label " << event.getLabel() << std::endl;
+				// FIXME: Possibly label the event
+			}
+
+		private:
+			MMP& mmp;
+		};
+
 		void propagate(const CandidateInterval& interval) {
 			if (interval.getFrontierPointIsAtVertex()) {
 				// FIXME: Find the vertex, then find opposite edges which are greater than 2*pi, then insertInteval()

@@ -78,19 +78,36 @@ namespace MeshShortestPath {
 	EndPointEvent::EndPointEvent(Kernel::Point_3 point, const CandidateInterval& candidateInterval) : label(computeLabel(point, candidateInterval)) {
 	}
 
-	static bool eventComparison(const std::unique_ptr<Event>& a, const std::unique_ptr<Event>& b) {
-		return a->getLabel() > b->getLabel();
+	class EventComparison {
+	public:
+		Kernel::FT operator()(const FrontierPointEvent& event) const {
+			return event.getLabel();
+		}
+
+		Kernel::FT operator()(const EndPointEvent& event) const {
+			return event.getLabel();
+		}
+	};
+
+	static bool eventComparison(const GenericEvent& a, const GenericEvent& b) {
+		Kernel::FT aLabel = boost::apply_visitor(EventComparison(), a);
+		Kernel::FT bLabel = boost::apply_visitor(EventComparison(), b);
+		return aLabel > bLabel;
 	}
 
-	void EventQueue::place(std::unique_ptr<Event>&& event) {
-		heap.emplace_back(std::move(event));
+	void EventQueue::place(FrontierPointEvent& event) {
+		heap.push_back(event);
 		std::push_heap(heap.begin(), heap.end(), &eventComparison);
 	}
 
-	std::unique_ptr<Event> EventQueue::remove() {
+	void EventQueue::place(EndPointEvent& event) {
+		heap.push_back(event);
+		std::push_heap(heap.begin(), heap.end(), &eventComparison);
+	}
+
+	GenericEvent EventQueue::remove() {
 		std::pop_heap(heap.begin(), heap.end(), &eventComparison);
-		std::unique_ptr<Event> result = std::move(heap.back());
-		assert(heap.back() == nullptr);
+		GenericEvent result = heap.back();
 		heap.pop_back();
 		return result;
 	}

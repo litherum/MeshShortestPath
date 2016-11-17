@@ -103,12 +103,12 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Users\lithe\Documents\src\boost_1_62_0;C:\Users\lithe\Documents\src\CGAL-4.9\Build\include;C:\Users\lithe\Documents\src\CGAL-4.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\lithe\Documents\src\boost_1_62_0\prefix\include\boost-1_62;C:\Users\lithe\Documents\src\CGAL-4.9\prefix\include;C:\Users\lithe\Documents\src\CGAL-4.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\lithe\Documents\src\CGAL-4.9\Build\lib;C:\Users\lithe\Documents\src\boost_1_62_0\stage\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Users\lithe\Documents\src\CGAL-4.9\prefix\lib;C:\Users\lithe\Documents\src\boost_1_62_0\prefix\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

@@ -79,14 +79,7 @@ namespace MeshShortestPath {
 		bool frontierPointIsAtVertex { false };
 	};
 
-	// FIXME: Use variants instead to avoid allocations
-	class Event {
-	public:
-		virtual ~Event() { }
-		virtual Kernel::FT getLabel() const = 0;
-	};
-
-	class FrontierPointEvent : public Event {
+	class FrontierPointEvent {
 	public:
 		FrontierPointEvent(Kernel::Point_3 point, std::list<CandidateInterval>::iterator candidateInterval) : point(point), candidateInterval(candidateInterval) {
 		}
@@ -95,35 +88,38 @@ namespace MeshShortestPath {
 			return candidateInterval;
 		}
 
-	private:
-		Kernel::FT getLabel() const override;
+		Kernel::FT getLabel() const;
 
+	private:
 		Kernel::Point_3 point;
 		std::list<CandidateInterval>::iterator candidateInterval;
 	};
 
-	class EndPointEvent : public Event {
+	class EndPointEvent {
 	public:
 		EndPointEvent(Kernel::Point_3 point, const CandidateInterval& candidateInterval);
 
-	private:
-		Kernel::FT getLabel() const override {
+		Kernel::FT getLabel() const {
 			return label;
 		}
 
+	private:
 		Kernel::Point_3 point;
 		Kernel::FT label;
 	};
 
+	typedef boost::variant<FrontierPointEvent, EndPointEvent> GenericEvent;
+
 	class EventQueue {
 	public:
-		void place(std::unique_ptr<Event>&&);
-		std::unique_ptr<Event> remove();
+		void place(FrontierPointEvent&);
+		void place(EndPointEvent&);
+		GenericEvent remove();
 		bool empty() const {
 			return heap.empty();
 		}
 
 	private:
-		std::vector<std::unique_ptr<Event>> heap;
+		std::vector<GenericEvent> heap;
 	};
 }
