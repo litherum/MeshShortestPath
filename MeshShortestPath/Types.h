@@ -49,13 +49,14 @@ namespace MeshShortestPath {
 	public:
 		CandidateInterval(
 			Polyhedron::Halfedge_handle halfedge,
-			Kernel::Point_3 root,
+			//Kernel::Point_3 root,
 			Kernel::Point_3 unfoldedRoot,
 			//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
 			Kernel::FT depth,
 			Kernel::FT leftExtent,
 			Kernel::FT rightExtent);
 
+		Polyhedron::Halfedge_handle getHalfedge() const { return halfedge; }
 		Kernel::Point_3 getUnfoldedRoot() const { return unfoldedRoot; }
 		Kernel::FT getDepth() const { return depth; }
 		Kernel::Point_3 getFrontierPoint() const { return frontierPoint; }
@@ -67,7 +68,7 @@ namespace MeshShortestPath {
 
 	private:
 		Polyhedron::Halfedge_handle halfedge;
-		Kernel::Point_3 root;
+		//Kernel::Point_3 root;
 		Kernel::Point_3 unfoldedRoot;
 		Kernel::Point_3 frontierPoint;
 		Kernel::Point_3 accessPoint;

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 
 #include "GenerateGeometry.h"
+#include <algorithm>
 
 namespace MeshShortestPath {
 
@@ -48,10 +49,22 @@ namespace MeshShortestPath {
 		}
 	};
 
+	class PlaneEquation {
+	public:
+		Polyhedron::Plane_3 operator()(Polyhedron::Facet& facet) {
+			auto halfedge = facet.halfedge();
+			auto p0 = halfedge->vertex()->point();
+			auto p1 = halfedge->next()->vertex()->point();
+			auto p2 = halfedge->next()->next()->vertex()->point();
+			return Polyhedron::Plane_3(p0, p1, p2);
+		}
+	};
+
 	Polyhedron generateCube() {
 		Polyhedron polyhedron;
 		Generator generator;
 		polyhedron.delegate(generator);
+		std::transform(polyhedron.facets_begin(), polyhedron.facets_end(), polyhedron.planes_begin(), PlaneEquation());
 		return polyhedron;
 	}
 }
