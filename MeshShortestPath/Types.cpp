@@ -18,18 +18,18 @@ namespace MeshShortestPath {
 		Kernel::Point_3 unfoldedRoot,
 		//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
 		Kernel::FT depth,
-		Kernel::FT leftExtent,
-		Kernel::FT rightExtent) :
+		Kernel::FT lowerExtent,
+		Kernel::FT upperExtent) :
 			halfedge(halfedge),
 			//root(root),
 			unfoldedRoot(unfoldedRoot),
 			//predecessor(predecessor),
 			depth(depth),
-			leftExtent(leftExtent),
-			rightExtent(rightExtent) {
-		assert(leftExtent <= rightExtent);
-		assert(leftExtent >= 0);
-		assert(rightExtent <= 1);
+			lowerExtent(lowerExtent),
+			upperExtent(upperExtent) {
+		assert(lowerExtent <= upperExtent);
+		assert(lowerExtent >= 0);
+		assert(upperExtent <= 1);
 		auto destination = halfedge->vertex()->point();
 		auto source = halfedge->opposite()->vertex()->point();
 		// Project unfoldedRoot onto the line from source to destination
@@ -38,30 +38,30 @@ namespace MeshShortestPath {
 		auto projectionFraction = (a * b) / (b * b);
 
 		// FIXME: Provide some more resilient way to test for frontier points coincident with vertices
-		if (projectionFraction <= leftExtent) {
-			projectionFraction = leftExtent;
+		if (projectionFraction <= lowerExtent) {
+			projectionFraction = lowerExtent;
 			frontierPointIsAtExtent = true;
 		}
-		else if (projectionFraction >= rightExtent) {
-			projectionFraction = rightExtent;
+		else if (projectionFraction >= upperExtent) {
+			projectionFraction = upperExtent;
 			frontierPointIsAtExtent = true;
 		}
 		frontierPoint = source + projectionFraction * b;
 		// FIXME: calculate accessPoint by intersecting a line between frontierPoint and unfoldedRoot with the other edges of the facet.
 	}
 
-	Kernel::Point_3 CandidateInterval::getLeftExtent() const {
+	Kernel::Point_3 CandidateInterval::getLowerExtent() const {
 		auto destination = halfedge->vertex()->point();
 		auto source = halfedge->opposite()->vertex()->point();
 		Kernel::Vector_3 s(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
-		return source + leftExtent * s;
+		return source + lowerExtent * s;
 	}
 
-	Kernel::Point_3 CandidateInterval::getRightExtent() const {
+	Kernel::Point_3 CandidateInterval::getUpperExtent() const {
 		auto destination = halfedge->vertex()->point();
 		auto source = halfedge->opposite()->vertex()->point();
 		Kernel::Vector_3 s(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
-		return source + rightExtent * s;
+		return source + upperExtent * s;
 	}
 
 	// Precondition: Point is part of the candidate interval.

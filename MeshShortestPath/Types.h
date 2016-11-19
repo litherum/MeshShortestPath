@@ -53,15 +53,15 @@ namespace MeshShortestPath {
 			Kernel::Point_3 unfoldedRoot,
 			//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
 			Kernel::FT depth,
-			Kernel::FT leftExtent,
-			Kernel::FT rightExtent);
+			Kernel::FT lowerExtent,
+			Kernel::FT upperExtent);
 
 		Polyhedron::Halfedge_handle getHalfedge() const { return halfedge; }
 		Kernel::Point_3 getUnfoldedRoot() const { return unfoldedRoot; }
 		Kernel::FT getDepth() const { return depth; }
 		Kernel::Point_3 getFrontierPoint() const { return frontierPoint; }
-		Kernel::Point_3 getLeftExtent() const;
-		Kernel::Point_3 getRightExtent() const;
+		Kernel::Point_3 getLowerExtent() const;
+		Kernel::Point_3 getUpperExtent() const;
 		bool getFrontierPointIsAtExtent() const { return frontierPointIsAtExtent; }
 		void setFrontierPointIsAtVertex(bool isAtVertex) { frontierPointIsAtVertex = isAtVertex; }
 		bool getFrontierPointIsAtVertex() const { return frontierPointIsAtVertex; }
@@ -74,8 +74,8 @@ namespace MeshShortestPath {
 		Kernel::Point_3 accessPoint;
 		//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor;
 		Kernel::FT depth;
-		Kernel::FT leftExtent;
-		Kernel::FT rightExtent;
+		Kernel::FT lowerExtent;
+		Kernel::FT upperExtent;
 		bool frontierPointIsAtExtent { false };
 		bool frontierPointIsAtVertex { false };
 	};
