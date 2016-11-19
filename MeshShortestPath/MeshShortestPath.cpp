@@ -167,6 +167,14 @@ namespace MeshShortestPath {
 			}
 		}
 
+		bool checkLineLineIntersectionResult(Kernel::FT result, Polyhedron::Point_3 p1, Kernel::Vector_3 v1, Polyhedron::Point_3 p2, Kernel::Vector_3 v2) {
+			auto resultPoint = p1 + result * v1;
+			Kernel::Line_3 l2(p2, v2);
+			auto projected = l2.projection(resultPoint);
+			auto displacement = projected - resultPoint;
+			return displacement.squared_length() <= 0.001;
+		}
+
 		Kernel::FT lineLineIntersection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2) {
 			// Calculates the fraction of the distance between a1 and a2 the intersection occurs.
 			Kernel::Vector_3 av(a2.x() - a1.x(), a2.y() - a1.y(), a2.z() - a1.z());
@@ -195,21 +203,25 @@ namespace MeshShortestPath {
 			auto denominatorXZAbs = std::abs(denominatorXZ);
 			auto denominatorYZAbs = std::abs(denominatorYZ);
 
+			Kernel::FT result;
+
 			if (denominatorXYAbs >= denominatorXZAbs && denominatorXYAbs >= denominatorYZAbs) {
 				// Use XY
 				auto numerator = calculateNumerator(a1.x(), a1.y(), b1.x(), b1.y(), bv.x(), bv.y());
-				return numerator / denominatorXY;
+				result = numerator / denominatorXY;
 			}
 			else if (denominatorXZAbs >= denominatorXYAbs && denominatorXZAbs >= denominatorYZAbs) {
 				// Use XZ
 				auto numerator = calculateNumerator(a1.x(), a1.z(), b1.x(), b1.z(), bv.x(), bv.z());
-				return numerator / denominatorXZ;
+				result = numerator / denominatorXZ;
 			}
 			else {
 				// Use YZ
 				auto numerator = calculateNumerator(a1.y(), a1.z(), b1.y(), b1.z(), bv.y(), bv.z());
-				return numerator / denominatorYZ;
+				result = numerator / denominatorYZ;
 			}
+			assert(checkLineLineIntersectionResult(result, a1, av, b1, bv));
+			return result;
 		}
 
 		std::array<boost::optional<CandidateInterval>, 2> project(const CandidateInterval& interval) {
