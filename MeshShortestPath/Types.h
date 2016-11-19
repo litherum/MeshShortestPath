@@ -11,6 +11,7 @@
 #undef CGAL_CHECK_EXPENSIVE
 
 #include <boost/variant.hpp>
+#include <boost/optional.hpp>
 
 namespace MeshShortestPath {
 
@@ -18,12 +19,17 @@ namespace MeshShortestPath {
 
 	class CandidateInterval;
 
-	bool insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals);
+	struct InsertIntervalResult {
+		std::vector<std::list<CandidateInterval>::iterator> toRemove;
+		bool isFirstOrLastOnHalfedge;
+	};
+
+	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals);
 
 	template <class Refs>
 	class HalfedgeWithIntervalVector : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 	public:
-		bool insertInterval(std::list<CandidateInterval>::iterator interval) {
+		boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval) {
 			return MeshShortestPath::insertInterval(interval, intervals);
 		}
 

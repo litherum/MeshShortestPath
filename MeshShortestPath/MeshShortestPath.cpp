@@ -70,8 +70,9 @@ namespace MeshShortestPath {
 				std::list<CandidateInterval>::iterator iterator = candidateIntervals.end();
 				--iterator;
 				assert(&*iterator == &candidateIntervals.back());
-				bool firstOrLastOnHalfedge = halfedge->insertInterval(iterator);
-				iterator->setFrontierPointIsAtVertex(iterator->getFrontierPointIsAtExtent() && firstOrLastOnHalfedge);
+				auto insertIntervalResult = halfedge->insertInterval(iterator);
+				assert(insertIntervalResult);
+				iterator->setFrontierPointIsAtVertex(iterator->getFrontierPointIsAtExtent() && insertIntervalResult->isFirstOrLastOnHalfedge);
 				eventQueue.place(FrontierPointEvent(iterator->getFrontierPoint(), iterator));
 				eventQueue.place(EndPointEvent(halfedge->vertex()->point(), *iterator));
 			});
@@ -119,13 +120,19 @@ namespace MeshShortestPath {
 			else {
 				auto projected = project(interval);
 
-				auto insert = [&](const CandidateInterval& candidateInterval) {
-					// FIXME: do insertInterval()
-				};
-
 				for (auto& candidateInterval : projected) {
-					if (candidateInterval)
-						insert(*candidateInterval);
+					if (candidateInterval) {
+						candidateIntervals.push_back(*candidateInterval);
+						auto iterator = candidateIntervals.end();
+						--iterator;
+						auto insertIntervalResult = candidateInterval->getHalfedge()->insertInterval(iterator);
+						if (insertIntervalResult) {
+							for (auto item : insertIntervalResult->toRemove)
+								candidateIntervals.erase(item);
+						}
+						else
+							candidateIntervals.erase(iterator);
+					}
 				}
 			}
 		}

@@ -6,10 +6,10 @@
 
 namespace MeshShortestPath {
 
-	bool insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals) {
+	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals) {
 		// FIXME: Implement this
 		intervals.push_back(interval);
-		return true;
+		return boost::none;
 	}
 
 	CandidateInterval::CandidateInterval(
