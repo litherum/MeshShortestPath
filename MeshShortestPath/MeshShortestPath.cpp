@@ -10,6 +10,9 @@
 #include <memory>
 #include <array>
 
+#define _USE_MATH_DEFINES 
+#include <cmath>
+
 #include "Types.h"
 #include "GenerateGeometry.h"
 
@@ -149,8 +152,9 @@ namespace MeshShortestPath {
 
 			Polyhedron::Point_3 newUnfoldedRoot;
 			auto crossProduct = CGAL::cross_product(originalNormal, newNormal);
-			if (crossProduct.squared_length() < 0.001) { // Coplanar
-				if (originalNormal * newNormal > 0)
+			auto dotProduct = originalNormal * newNormal;
+			if (std::abs(crossProduct.squared_length()) < 0.001) { // Coplanar
+				if (dotProduct > 0)
 					newUnfoldedRoot = interval.getUnfoldedRoot();
 				else {
 					auto unfoldedRoot = interval.getUnfoldedRoot();
@@ -163,6 +167,8 @@ namespace MeshShortestPath {
 				auto magnitude = std::sqrt(crossProduct.squared_length());
 				auto axis = crossProduct / magnitude;
 				auto angle = std::asin(magnitude);
+				if (dotProduct < 0)
+					angle = M_PI - angle;
 
 				auto unfoldedRoot = interval.getUnfoldedRoot();
 				auto projection = Kernel::Line_3(halfedge->vertex()->point(), opposite->vertex()->point()).projection(unfoldedRoot);
