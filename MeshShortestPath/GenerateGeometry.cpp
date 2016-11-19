@@ -19,14 +19,14 @@ namespace MeshShortestPath {
 		void operator()(HalfedgeDS& halfedgeDS) {
 			CGAL::Polyhedron_incremental_builder_3<HalfedgeDS> builder(halfedgeDS, true);
 			builder.begin_surface(0, 0, 0);
-			builder.add_vertex(Polyhedron::Point(0, 0, 0));
-			builder.add_vertex(Polyhedron::Point(0, 1, 0));
-			builder.add_vertex(Polyhedron::Point(1, 1, 0));
-			builder.add_vertex(Polyhedron::Point(1, 0, 0));
 			builder.add_vertex(Polyhedron::Point(0, 0, 1));
 			builder.add_vertex(Polyhedron::Point(0, 1, 1));
 			builder.add_vertex(Polyhedron::Point(1, 1, 1));
 			builder.add_vertex(Polyhedron::Point(1, 0, 1));
+			builder.add_vertex(Polyhedron::Point(0, 0, 0));
+			builder.add_vertex(Polyhedron::Point(0, 1, 0));
+			builder.add_vertex(Polyhedron::Point(1, 1, 0));
+			builder.add_vertex(Polyhedron::Point(1, 0, 0));
 			// Front
 			addTriangle(builder, 0, 1, 2);
 			addTriangle(builder, 2, 3, 0);

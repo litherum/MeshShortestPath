@@ -131,13 +131,20 @@ namespace MeshShortestPath {
 		}
 
 		Polyhedron::Point_3 calculateUnfoldedRoot(Polyhedron::Point_3 oldUnfoldedRoot, Polyhedron::Plane_3 originalPlane, Polyhedron::Plane_3 newPlane, Kernel::Line_3 intersection) {
+			std::cout << "Calculating unfolded root between two planes: " << std::endl;
+			std::cout << originalPlane << std::endl;
+			std::cout << newPlane << std::endl;
+			std::cout << intersection << std::endl;
+			std::cout << oldUnfoldedRoot << std::endl;
+			std::cout << "End of dump" << std::endl;
+
+
 			auto originalNormal = originalPlane.orthogonal_vector();
 			originalNormal = originalNormal / std::sqrt(originalNormal.squared_length());
 
 			auto newNormal = newPlane.orthogonal_vector();
 			newNormal = newNormal / std::sqrt(newNormal.squared_length());
 
-			Polyhedron::Point_3 newUnfoldedRoot;
 			auto crossProduct = CGAL::cross_product(originalNormal, newNormal);
 			auto dotProduct = originalNormal * newNormal;
 			if (std::abs(crossProduct.squared_length()) < 0.001) { // Coplanar
@@ -203,25 +210,55 @@ namespace MeshShortestPath {
 			auto denominatorXZAbs = std::abs(denominatorXZ);
 			auto denominatorYZAbs = std::abs(denominatorYZ);
 
-			Kernel::FT result;
+			Kernel::FT t;
 
 			if (denominatorXYAbs >= denominatorXZAbs && denominatorXYAbs >= denominatorYZAbs) {
 				// Use XY
 				auto numerator = calculateNumerator(a1.x(), a1.y(), b1.x(), b1.y(), bv.x(), bv.y());
-				result = numerator / denominatorXY;
+				t = numerator / denominatorXY;
 			}
 			else if (denominatorXZAbs >= denominatorXYAbs && denominatorXZAbs >= denominatorYZAbs) {
 				// Use XZ
 				auto numerator = calculateNumerator(a1.x(), a1.z(), b1.x(), b1.z(), bv.x(), bv.z());
-				result = numerator / denominatorXZ;
+				t = numerator / denominatorXZ;
 			}
 			else {
 				// Use YZ
 				auto numerator = calculateNumerator(a1.y(), a1.z(), b1.y(), b1.z(), bv.y(), bv.z());
-				result = numerator / denominatorYZ;
+				t = numerator / denominatorYZ;
 			}
-			assert(checkLineLineIntersectionResult(result, a1, av, b1, bv));
-			return result;
+			assert(checkLineLineIntersectionResult(t, a1, av, b1, bv));
+
+			// Calculate s to see if it is negative.
+			// a + t*b = c + s*d
+			// s = (a + t*b - c) / d
+
+			auto calculateS = [&](Kernel::FT p1, Kernel::FT v1, Kernel::FT p2, Kernel::FT v2) {
+				// a, b, c, d
+				return (p1 + t * v1 - p2) / v2;
+			};
+
+			auto bvxAbs = std::abs(bv.x());
+			auto bvyAbs = std::abs(bv.y());
+			auto bvzAbs = std::abs(bv.z());
+
+			Kernel::FT s;
+
+			if (bvxAbs >= bvyAbs && bvxAbs >= bvzAbs)
+				s = calculateS(a1.x(), av.x(), b1.x(), bv.x());
+			else if (bvyAbs >= bvxAbs && bvyAbs >= bvzAbs)
+				s = calculateS(a1.y(), av.y(), b1.y(), bv.y());
+			else
+				s = calculateS(a1.z(), av.z(), b1.z(), bv.z());
+
+			if (s < 0) {
+				if (av * bv > 0)
+					return std::numeric_limits<Kernel::FT>::infinity();
+				else
+					return -std::numeric_limits<Kernel::FT>::infinity();
+			}
+			else
+				return t;
 		}
 
 		std::array<boost::optional<CandidateInterval>, 2> project(const CandidateInterval& interval) {
@@ -231,13 +268,12 @@ namespace MeshShortestPath {
 			auto nextnext = next->next();
 			assert(nextnext->next() == opposite);
 
+			std::cout << "Projecting halfedge " << opposite->vertex()->point() << " " << halfedge->vertex()->point() << std::endl;
+			std::cout << "Onto " << next->vertex()->point() << std::endl;
+
 			auto newUnfoldedRoot = calculateUnfoldedRoot(interval.getUnfoldedRoot(), halfedge->facet()->plane(), opposite->facet()->plane(), Kernel::Line_3(halfedge->vertex()->point(), opposite->vertex()->point()));
 
-			auto horizon1 = Kernel::Line_3(newUnfoldedRoot, interval.getLowerExtent());
-			auto horizon2 = Kernel::Line_3(newUnfoldedRoot, interval.getUpperExtent());
-
 			auto project = [&](Polyhedron::Halfedge_handle halfedge) -> boost::optional<CandidateInterval> {
-				auto line = Kernel::Line_3(halfedge->vertex()->point(), halfedge->opposite()->vertex()->point());
 				auto lowerScalar = lineLineIntersection(halfedge->opposite()->vertex()->point(), halfedge->vertex()->point(), newUnfoldedRoot, interval.getLowerExtent());
 				auto upperScalar = lineLineIntersection(halfedge->opposite()->vertex()->point(), halfedge->vertex()->point(), newUnfoldedRoot, interval.getUpperExtent());
 				assert(upperScalar >= lowerScalar);
