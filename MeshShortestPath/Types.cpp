@@ -24,6 +24,55 @@ namespace MeshShortestPath {
 		return begin;
 	}
 
+	static std::vector<Kernel::FT> quadraticFormula(Kernel::FT a, Kernel::FT b, Kernel::FT c) {
+		auto discriminant = b * b - 4 * a * c;
+		if (discriminant < 0)
+			return {};
+		else if (discriminant == 0) // FIXME: Possibly round a little
+			return { -b / (2 * a) };
+		else {
+			auto discriminantSquareRoot = std::sqrt(discriminant);
+			return { (-b + discriminantSquareRoot) / (2 * a), (-b - discriminantSquareRoot) / (2 * a) };
+		}
+	}
+
+	static std::vector<Kernel::FT> calculateTiePoints(Kernel::FT d1, Kernel::FT r1, Kernel::FT b, Kernel::FT d2, Kernel::FT r2) {
+		// b = d1 + d2
+		// d1 + sqrt(r1^2 + b1^2) = d2 + sqrt(r2^2 + b2^2)
+		auto d = d1 - d2;
+		auto ra = r1 * r1;
+		auto rb = r2 * r2;
+		// d + sqrt(ra + b1^2) = sqrt(rb + (b - b1)^2)
+
+		if (d == 0) {
+			// sqrt(ra + b1^2) = sqrt(rb + (b - b1)^2)
+			// ra + b1^2 = rb + (b - b1)^2
+			// ra + b1^2 = rb + b^2 - 2*b*b1 * b1^2
+			// ra = rb + b^2 - 2*b*b1
+			// b1 * 2b = rb + b^2 - ra
+			assert(b != 0);
+			return { (rb + b * b - ra) / (2 * b) };
+		}
+
+		// d^2 + 2d * sqrt(ra + b1^2) + ra + b1^2 = rb + (b - b1)^2 // good
+		// sqrt(ra + b1^2) = (rb + (b - b1)^2 - d^2 - ra - b1^2) / 2d
+		// ra + b1^2 = (rb + (b - b1)^2 - d^2 - ra - b1^2)^2 / (4d^2)
+		// 4d^2 * (ra + b1^2) = (rb + (b - b1)^2 - d^2 - ra - b1^2) ^ 2
+		// 4d^2 * (ra + b1^2) = (rb + b^2 - 2*b*b1 + b1^2 - d^2 - ra - b1^2) ^ 2
+		// 4d^2 * (ra + b1^2) = (rb + b^2 - 2*b*b1 - d^2 - ra) ^ 2
+		auto m = rb + b*b - d*d - ra;
+		// 4d^2 * (ra + b1^2) = (m - 2*b*b1) ^ 2
+		// 4d^2 * (ra + b1^2) = m^2 - 4*m*b*b1 + 4*b^2*b1^2
+		// 0 = b1^2 * (4b^2 - 4d^2) + b1 * (-4mb) + (m^2 - 4d^2 * ra)
+		auto candidates = quadraticFormula(4 * b * b - 4 * d * d, -4 * m * b, m * m - 4 * d * d * ra);
+		std::vector<Kernel::FT> result;
+		std::copy_if(candidates.begin(), candidates.end(), std::back_inserter(result), [&](Kernel::FT b1) {
+			return (rb + (b - b1) * (b - b1) - d * d - ra - b1 * b1) / (2 * d) >= 0 &&
+				d + sqrt(ra + b1 *b1) >= 0;
+		});
+		return result;
+	}
+
 	boost::optional<bool> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
 		CandidateInterval::AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval->getHalfedge()->next() };
 

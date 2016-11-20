@@ -130,6 +130,7 @@ namespace MeshShortestPath {
 						auto iterator = candidateIntervals.end();
 						--iterator;
 						auto insertIntervalResult = candidateInterval->getHalfedge()->insertInterval(iterator, interval, [&](CandidateInterval candidateInterval) {
+							// FIXME: Possibly (maybe always?) add the candidateInterval to the event queue
 							return candidateIntervals.insert(candidateIntervals.end(), candidateInterval);
 						});
 						if (insertIntervalResult) {
