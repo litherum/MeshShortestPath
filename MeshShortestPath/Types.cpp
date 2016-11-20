@@ -12,6 +12,18 @@ namespace MeshShortestPath {
 		return std::sqrt(Kernel::Vector_3(b.x() - a.x(), b.y() - a.y(), b.z() - a.z()).squared_length());
 	}
 
+	template <typename T>
+	static T findEndOfDominatedIntervals(T begin, T end, Polyhedron::Point_3 (CandidateInterval::*extentFunction)() const, const CandidateInterval& interval) {
+		while (begin != end) {
+			if (distanceBetweenPoints(((**begin).*extentFunction)(), (*begin)->getUnfoldedRoot()) + (*begin)->getDepth() >=
+				distanceBetweenPoints(((**begin).*extentFunction)(), interval.getUnfoldedRoot()) + interval.getDepth())
+				++begin;
+			else
+				break;
+		}
+		return begin;
+	}
+
 	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor) {
 		CandidateInterval::AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval->getHalfedge()->next() };
 
@@ -25,33 +37,11 @@ namespace MeshShortestPath {
 
 		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
 
-		auto beginDeletingReverse = std::make_reverse_iterator(location);
-		unsigned count = 0;
-		while (beginDeletingReverse != intervals.rend()) {
-			if (distanceBetweenPoints((*beginDeletingReverse)->getUpperExtent(), (*beginDeletingReverse)->getUnfoldedRoot()) + (*beginDeletingReverse)->getDepth() >= distanceBetweenPoints((*beginDeletingReverse)->getUpperExtent(), interval->getUnfoldedRoot()) + interval->getDepth()) {
-				++count;
-				++beginDeletingReverse;
-			}
-			else
-				break;
-		}
-		auto beginDeleting = location;
-		// There's no way (I can find) to turn a reverse_iterator back into a regular iterator, so this is a workaround.
-		for (unsigned i = 0; i < count; ++i)
-			--beginDeleting;
+		auto beginDeleting = findEndOfDominatedIntervals(std::make_reverse_iterator(location), intervals.rend(), &CandidateInterval::getLowerExtent, *interval);
+		auto endDeleting = findEndOfDominatedIntervals(location, intervals.end(), &CandidateInterval::getUpperExtent, *interval);
 
-		auto endDeleting = location;
-		while (endDeleting != intervals.end()) {
-			if (distanceBetweenPoints((*endDeleting)->getUpperExtent(), (*endDeleting)->getUnfoldedRoot()) + (*endDeleting)->getDepth() >= distanceBetweenPoints((*endDeleting)->getUpperExtent(), interval->getUnfoldedRoot()) + interval->getDepth())
-				++endDeleting;
-			else
-				break;
-		}
-
-		if (beginDeleting != intervals.begin()) {
-			auto trimLeft = beginDeleting;
-			--beginDeleting;
-			// FIXME: Trim *trimLeft and interval.
+		if (beginDeleting != intervals.rend()) {
+			// FIXME: Trim *beginDeleting and interval.
 			// Modifying the extents may require recomputation of the frontier point and access point.
 		}
 
@@ -63,10 +53,10 @@ namespace MeshShortestPath {
 		// FIXME: Figure out when we should be returning boost::none.
 		
 		InsertIntervalResult result;
-		std::copy(beginDeleting, endDeleting, std::back_inserter(result.toRemove));
-		result.isFirstOrLastOnHalfedge = beginDeleting == intervals.begin() || endDeleting == intervals.end();
+		std::copy(beginDeleting.base(), endDeleting, std::back_inserter(result.toRemove));
+		result.isFirstOrLastOnHalfedge = beginDeleting == intervals.rend() || endDeleting == intervals.end();
 
-		auto toInsert = intervals.erase(beginDeleting, endDeleting);
+		auto toInsert = intervals.erase(beginDeleting.base(), endDeleting);
 		intervals.insert(toInsert, interval);
 
 		return result;
