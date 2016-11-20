@@ -74,6 +74,8 @@ namespace MeshShortestPath {
 		bool getFrontierPointIsAtExtent() const { return frontierPointIsAtExtent; }
 		void setFrontierPointIsAtVertex(bool isAtVertex) { frontierPointIsAtVertex = isAtVertex; }
 		bool getFrontierPointIsAtVertex() const { return frontierPointIsAtVertex; }
+		bool isDeleted() const { return deleted; }
+		void setDeleted() { deleted = true; }
 
 	private:
 		friend boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor);
@@ -94,11 +96,12 @@ namespace MeshShortestPath {
 		Kernel::FT frontierPoint;
 		bool frontierPointIsAtExtent { false };
 		bool frontierPointIsAtVertex { false };
+		bool deleted { false };
 	};
 
 	class FrontierPointEvent {
 	public:
-		FrontierPointEvent(Kernel::Point_3 point, std::list<CandidateInterval>::iterator candidateInterval) : point(point), candidateInterval(candidateInterval) {
+		FrontierPointEvent(std::list<CandidateInterval>::iterator candidateInterval) : point(candidateInterval->getFrontierPoint()), candidateInterval(candidateInterval) {
 		}
 
 		std::list<CandidateInterval>::iterator getCandidateInterval() const {

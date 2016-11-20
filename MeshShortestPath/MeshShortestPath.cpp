@@ -72,7 +72,7 @@ namespace MeshShortestPath {
 				assert(&*iterator == &candidateIntervals.back());
 				halfedge->insertInitialInterval(iterator);
 				iterator->setFrontierPointIsAtVertex(iterator->getFrontierPointIsAtExtent());
-				eventQueue.place(FrontierPointEvent(iterator->getFrontierPoint(), iterator));
+				eventQueue.place(FrontierPointEvent(iterator));
 				eventQueue.place(EndPointEvent(halfedge->vertex()->point(), *iterator));
 			});
 		}
@@ -98,6 +98,9 @@ namespace MeshShortestPath {
 			}
 
 			void operator()(const FrontierPointEvent& event) const {
+				if (event.getCandidateInterval()->isDeleted())
+					return;
+
 				std::cout << "Encountering event with label " << event.getLabel() << std::endl;
 				// FIXME: Possibly label the event
 				mmp.propagate(*event.getCandidateInterval());
@@ -126,8 +129,10 @@ namespace MeshShortestPath {
 						--iterator;
 						auto insertIntervalResult = candidateInterval->getHalfedge()->insertInterval(iterator, interval);
 						if (insertIntervalResult) {
+							eventQueue.place(FrontierPointEvent(iterator)); // FIXME: Maybe add more things to the event queue
+							// FIXME: Check if the frontier point is a vertex
 							for (auto item : insertIntervalResult->toRemove)
-								candidateIntervals.erase(item);
+								item->setDeleted(); // The event queue has iterators into the candidateIntervals list, so we can't simply delete them without updating the event queue.
 						}
 						else
 							candidateIntervals.erase(iterator);

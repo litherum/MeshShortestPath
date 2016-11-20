@@ -3,21 +3,17 @@
 #include "Types.h"
 
 #include <algorithm>
+#include <iterator>
 #include <cassert>
 
 namespace MeshShortestPath {
 
-	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor) {
-		if (intervals.empty()) {
-			intervals.push_back(interval);
-			return { { {}, true } };
-		}
+	static Kernel::FT distanceBetweenPoints(Polyhedron::Point_3 a, Polyhedron::Point_3 b) {
+		return std::sqrt(Kernel::Vector_3(b.x() - a.x(), b.y() - a.y(), b.z() - a.z()).squared_length());
+	}
 
-		CandidateInterval::AccessPoint searchFor;
-		if (predecessor.getHalfedge()->opposite() == interval->getHalfedge()->next())
-			searchFor = { 1 - predecessor.frontierPoint, true };
-		else
-			searchFor = { 1 - predecessor.frontierPoint, false };
+	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor) {
+		CandidateInterval::AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval->getHalfedge()->next() };
 
 		auto searchComparison = [](const CandidateInterval::AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
 			if (existing->accessPoint.initialSide && !probe.initialSide)
@@ -29,9 +25,50 @@ namespace MeshShortestPath {
 
 		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
 
-		// FIXME: Insert just before |location|.
+		auto beginDeletingReverse = std::make_reverse_iterator(location);
+		unsigned count = 0;
+		while (beginDeletingReverse != intervals.rend()) {
+			if (distanceBetweenPoints((*beginDeletingReverse)->getUpperExtent(), (*beginDeletingReverse)->getUnfoldedRoot()) + (*beginDeletingReverse)->getDepth() >= distanceBetweenPoints((*beginDeletingReverse)->getUpperExtent(), interval->getUnfoldedRoot()) + interval->getDepth()) {
+				++count;
+				++beginDeletingReverse;
+			}
+			else
+				break;
+		}
+		auto beginDeleting = location;
+		for (unsigned i = 0; i < count; ++i)
+			--beginDeleting;
 
-		return boost::none;
+		auto endDeleting = location;
+		while (endDeleting != intervals.end()) {
+			if (distanceBetweenPoints((*endDeleting)->getUpperExtent(), (*endDeleting)->getUnfoldedRoot()) + (*endDeleting)->getDepth() >= distanceBetweenPoints((*endDeleting)->getUpperExtent(), interval->getUnfoldedRoot()) + interval->getDepth())
+				++endDeleting;
+			else
+				break;
+		}
+
+		if (beginDeleting != intervals.begin()) {
+			auto trimLeft = beginDeleting;
+			--beginDeleting;
+			// FIXME: Trim *trimLeft and interval.
+			// Modifying the extents may require recomputation of the frontier point and access point.
+		}
+
+		if (endDeleting != intervals.end()) {
+			// FIXME: Trim *endDeleting and interval.
+			// Modifying the extents may require recomputation of the frontier point and access point.
+		}
+
+		// FIXME: Figure out when we should be returning boost::none.
+		
+		InsertIntervalResult result;
+		std::copy(beginDeleting, endDeleting, std::back_inserter(result.toRemove));
+		result.isFirstOrLastOnHalfedge = beginDeleting == intervals.begin() || endDeleting == intervals.end();
+
+		auto toInsert = intervals.erase(beginDeleting, endDeleting);
+		intervals.insert(toInsert, interval);
+
+		return result;
 	}
 
 	CandidateInterval::CandidateInterval(
