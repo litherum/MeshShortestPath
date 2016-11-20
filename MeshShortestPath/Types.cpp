@@ -36,6 +36,7 @@ namespace MeshShortestPath {
 				break;
 		}
 		auto beginDeleting = location;
+		// There's no way (I can find) to turn a reverse_iterator back into a regular iterator, so this is a workaround.
 		for (unsigned i = 0; i < count; ++i)
 			--beginDeleting;
 
