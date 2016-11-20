@@ -8,6 +8,11 @@
 namespace MeshShortestPath {
 
 	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor) {
+		if (intervals.empty()) {
+			intervals.push_back(interval);
+			return { { {}, true } };
+		}
+
 		CandidateInterval::AccessPoint searchFor;
 		if (predecessor.getHalfedge()->opposite() == interval->getHalfedge()->next())
 			searchFor = { 1 - predecessor.frontierPoint, true };
@@ -26,7 +31,6 @@ namespace MeshShortestPath {
 
 		// FIXME: Insert just before |location|.
 
-		intervals.push_back(interval);
 		return boost::none;
 	}
 
