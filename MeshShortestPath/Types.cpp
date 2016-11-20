@@ -3,27 +3,41 @@
 #include "Types.h"
 
 #include <algorithm>
+#include <cassert>
 
 namespace MeshShortestPath {
 
-	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals) {
-		// FIXME: Implement this
+	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor) {
+		CandidateInterval::AccessPoint searchFor;
+		if (predecessor.getHalfedge()->opposite() == interval->getHalfedge()->next())
+			searchFor = { 1 - predecessor.frontierPoint, true };
+		else
+			searchFor = { 1 - predecessor.frontierPoint, false };
+
+		auto searchComparison = [](const CandidateInterval::AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
+			if (existing->accessPoint.initialSide && !probe.initialSide)
+				return true;
+			if (!existing->accessPoint.initialSide && probe.initialSide)
+				return false;
+			return existing->accessPoint.location < probe.location;
+		};
+
+		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
+
+		// FIXME: Insert just before |location|.
+
 		intervals.push_back(interval);
 		return boost::none;
 	}
 
 	CandidateInterval::CandidateInterval(
 		Polyhedron::Halfedge_handle halfedge,
-		//Kernel::Point_3 root,
 		Kernel::Point_3 unfoldedRoot,
-		//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
 		Kernel::FT depth,
 		Kernel::FT lowerExtent,
 		Kernel::FT upperExtent) :
 			halfedge(halfedge),
-			//root(root),
 			unfoldedRoot(unfoldedRoot),
-			//predecessor(predecessor),
 			depth(depth),
 			lowerExtent(lowerExtent),
 			upperExtent(upperExtent) {
@@ -35,19 +49,45 @@ namespace MeshShortestPath {
 		// Project unfoldedRoot onto the line from source to destination
 		Kernel::Vector_3 a(unfoldedRoot.x() - source.x(), unfoldedRoot.y() - source.y(), unfoldedRoot.z() - source.z());
 		Kernel::Vector_3 b(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
-		auto projectionFraction = (a * b) / (b * b);
+		frontierPoint = (a * b) / (b * b);
 
 		// FIXME: Provide some more resilient way to test for frontier points coincident with vertices
-		if (projectionFraction <= lowerExtent) {
-			projectionFraction = lowerExtent;
+		if (frontierPoint <= lowerExtent) {
+			frontierPoint = lowerExtent;
 			frontierPointIsAtExtent = true;
 		}
-		else if (projectionFraction >= upperExtent) {
-			projectionFraction = upperExtent;
+		else if (frontierPoint >= upperExtent) {
+			frontierPoint = upperExtent;
 			frontierPointIsAtExtent = true;
 		}
-		frontierPoint = source + projectionFraction * b;
-		// FIXME: calculate accessPoint by intersecting a line between frontierPoint and unfoldedRoot with the other edges of the facet.
+
+		accessPoint = calculateAccessPoint();
+	}
+
+	auto CandidateInterval::calculateAccessPoint() const -> AccessPoint {
+		auto initialSideFraction = lineLineIntersection(halfedge->vertex()->point(), halfedge->next()->vertex()->point(), unfoldedRoot, getFrontierPoint());
+		if (initialSideFraction > 1 || initialSideFraction < 0) {
+			auto secondarySideFraction = lineLineIntersection(halfedge->next()->vertex()->point(), halfedge->next()->next()->vertex()->point(), unfoldedRoot, getFrontierPoint());
+			if (secondarySideFraction > 1 || secondarySideFraction < 0) {
+				auto initialSideDistance = std::min(std::abs(initialSideFraction), std::abs(initialSideFraction - 1));
+				auto secondarySideDistance = std::min(std::abs(secondarySideFraction), std::abs(secondarySideFraction - 1));
+				if (initialSideDistance < secondarySideDistance)
+					return { std::min(std::max(initialSideFraction, Kernel::FT(0)), Kernel::FT(1)), true };
+				else
+					return { std::min(std::max(secondarySideFraction, Kernel::FT(0)), Kernel::FT(1)), false };
+			}
+			else
+				return { secondarySideFraction, false };
+		}
+		else
+			return { initialSideFraction, true };
+	}
+
+	Kernel::Point_3 CandidateInterval::getFrontierPoint() const {
+		auto destination = halfedge->vertex()->point();
+		auto source = halfedge->opposite()->vertex()->point();
+		Kernel::Vector_3 s(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
+		return source + frontierPoint * s;
 	}
 
 	Kernel::Point_3 CandidateInterval::getLowerExtent() const {
@@ -110,5 +150,62 @@ namespace MeshShortestPath {
 		GenericEvent result = heap.back();
 		heap.pop_back();
 		return result;
+	}
+
+	static bool checkLineLineIntersectionResult(Kernel::FT result, Polyhedron::Point_3 p1, Kernel::Vector_3 v1, Polyhedron::Point_3 p2, Kernel::Vector_3 v2) {
+		auto resultPoint = p1 + result * v1;
+		Kernel::Line_3 l2(p2, v2);
+		auto projected = l2.projection(resultPoint);
+		auto displacement = projected - resultPoint;
+		return displacement.squared_length() <= 0.001;
+	}
+
+	Kernel::FT lineLineIntersection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2) {
+		// Calculates the fraction of the distance between a1 and a2 the intersection occurs.
+		Kernel::Vector_3 av(a2.x() - a1.x(), a2.y() - a1.y(), a2.z() - a1.z());
+		Kernel::Vector_3 bv(b2.x() - b1.x(), b2.y() - b1.y(), b2.z() - b1.z());
+
+		// a + t*b = c + s*d, f + t*g = h + s*j
+		// t = (-a * j + c * j + d * f - d * h) / (b * j - d * g)
+
+		auto calculateDenominator = [](Kernel::FT v1p, Kernel::FT v1q, Kernel::FT v2p, Kernel::FT v2q) {
+			// b, g, d, j
+			// return b * j - d * g
+			return v1p * v2q - v2p * v1q;
+		};
+
+		auto calculateNumerator = [](Kernel::FT p1p, Kernel::FT p1q, Kernel::FT p2p, Kernel::FT p2q, Kernel::FT v2p, Kernel::FT v2q) {
+			// a, f, c, h, d, j
+			// return -a * j + c * j + d * f - d * h
+			return -p1p * v2q + p2p * v2q + v2p * p1q - v2p * p2q;
+		};
+
+		auto denominatorXY = calculateDenominator(av.x(), av.y(), bv.x(), bv.y());
+		auto denominatorXZ = calculateDenominator(av.x(), av.z(), bv.x(), bv.z());
+		auto denominatorYZ = calculateDenominator(av.y(), av.z(), bv.y(), bv.z());
+
+		auto denominatorXYAbs = std::abs(denominatorXY);
+		auto denominatorXZAbs = std::abs(denominatorXZ);
+		auto denominatorYZAbs = std::abs(denominatorYZ);
+
+		Kernel::FT t;
+
+		if (denominatorXYAbs >= denominatorXZAbs && denominatorXYAbs >= denominatorYZAbs) {
+			// Use XY
+			auto numerator = calculateNumerator(a1.x(), a1.y(), b1.x(), b1.y(), bv.x(), bv.y());
+			t = numerator / denominatorXY;
+		}
+		else if (denominatorXZAbs >= denominatorXYAbs && denominatorXZAbs >= denominatorYZAbs) {
+			// Use XZ
+			auto numerator = calculateNumerator(a1.x(), a1.z(), b1.x(), b1.z(), bv.x(), bv.z());
+			t = numerator / denominatorXZ;
+		}
+		else {
+			// Use YZ
+			auto numerator = calculateNumerator(a1.y(), a1.z(), b1.y(), b1.z(), bv.y(), bv.z());
+			t = numerator / denominatorYZ;
+		}
+		assert(checkLineLineIntersectionResult(t, a1, av, b1, bv));
+		return t;
 	}
 }

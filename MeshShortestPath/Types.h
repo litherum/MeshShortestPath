@@ -24,13 +24,18 @@ namespace MeshShortestPath {
 		bool isFirstOrLastOnHalfedge;
 	};
 
-	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals);
+	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor);
 
 	template <class Refs>
 	class HalfedgeWithIntervalVector : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 	public:
-		boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval) {
-			return MeshShortestPath::insertInterval(interval, intervals);
+		boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, const CandidateInterval& predecessor) {
+			return MeshShortestPath::insertInterval(interval, intervals, predecessor);
+		}
+
+		void insertInitialInterval(std::list<CandidateInterval>::iterator interval) {
+			assert(intervals.empty());
+			intervals.push_back(interval);
 		}
 
 		void clear() {
@@ -55,9 +60,7 @@ namespace MeshShortestPath {
 	public:
 		CandidateInterval(
 			Polyhedron::Halfedge_handle halfedge,
-			//Kernel::Point_3 root,
 			Kernel::Point_3 unfoldedRoot,
-			//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor,
 			Kernel::FT depth,
 			Kernel::FT lowerExtent,
 			Kernel::FT upperExtent);
@@ -65,7 +68,7 @@ namespace MeshShortestPath {
 		Polyhedron::Halfedge_handle getHalfedge() const { return halfedge; }
 		Kernel::Point_3 getUnfoldedRoot() const { return unfoldedRoot; }
 		Kernel::FT getDepth() const { return depth; }
-		Kernel::Point_3 getFrontierPoint() const { return frontierPoint; }
+		Kernel::Point_3 getFrontierPoint() const;
 		Kernel::Point_3 getLowerExtent() const;
 		Kernel::Point_3 getUpperExtent() const;
 		bool getFrontierPointIsAtExtent() const { return frontierPointIsAtExtent; }
@@ -73,15 +76,22 @@ namespace MeshShortestPath {
 		bool getFrontierPointIsAtVertex() const { return frontierPointIsAtVertex; }
 
 	private:
-		Polyhedron::Halfedge_handle halfedge;
-		//Kernel::Point_3 root;
+		friend boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor);
+
+		struct AccessPoint {
+			Kernel::FT location;
+			bool initialSide;
+		};
+
+		AccessPoint calculateAccessPoint() const;
+
 		Kernel::Point_3 unfoldedRoot;
-		Kernel::Point_3 frontierPoint;
-		Kernel::Point_3 accessPoint;
-		//boost::variant<Kernel::Point_3, std::reference_wrapper<CandidateInterval>> predecessor;
+		Polyhedron::Halfedge_handle halfedge;
+		AccessPoint accessPoint;
 		Kernel::FT depth;
-		Kernel::FT lowerExtent;
+		Kernel::FT lowerExtent; // 0 <= lowerExtent <= frontierPoint <= upperExtent <= 1
 		Kernel::FT upperExtent;
+		Kernel::FT frontierPoint;
 		bool frontierPointIsAtExtent { false };
 		bool frontierPointIsAtVertex { false };
 	};
@@ -129,4 +139,6 @@ namespace MeshShortestPath {
 	private:
 		std::vector<GenericEvent> heap;
 	};
+
+	Kernel::FT lineLineIntersection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2);
 }

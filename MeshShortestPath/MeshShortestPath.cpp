@@ -70,9 +70,8 @@ namespace MeshShortestPath {
 				std::list<CandidateInterval>::iterator iterator = candidateIntervals.end();
 				--iterator;
 				assert(&*iterator == &candidateIntervals.back());
-				auto insertIntervalResult = halfedge->insertInterval(iterator);
-				assert(insertIntervalResult);
-				iterator->setFrontierPointIsAtVertex(iterator->getFrontierPointIsAtExtent() && insertIntervalResult->isFirstOrLastOnHalfedge);
+				halfedge->insertInitialInterval(iterator);
+				iterator->setFrontierPointIsAtVertex(iterator->getFrontierPointIsAtExtent());
 				eventQueue.place(FrontierPointEvent(iterator->getFrontierPoint(), iterator));
 				eventQueue.place(EndPointEvent(halfedge->vertex()->point(), *iterator));
 			});
@@ -125,7 +124,7 @@ namespace MeshShortestPath {
 						candidateIntervals.push_back(*candidateInterval);
 						auto iterator = candidateIntervals.end();
 						--iterator;
-						auto insertIntervalResult = candidateInterval->getHalfedge()->insertInterval(iterator);
+						auto insertIntervalResult = candidateInterval->getHalfedge()->insertInterval(iterator, interval);
 						if (insertIntervalResult) {
 							for (auto item : insertIntervalResult->toRemove)
 								candidateIntervals.erase(item);
@@ -181,60 +180,8 @@ namespace MeshShortestPath {
 			}
 		}
 
-		bool checkLineLineIntersectionResult(Kernel::FT result, Polyhedron::Point_3 p1, Kernel::Vector_3 v1, Polyhedron::Point_3 p2, Kernel::Vector_3 v2) {
-			auto resultPoint = p1 + result * v1;
-			Kernel::Line_3 l2(p2, v2);
-			auto projected = l2.projection(resultPoint);
-			auto displacement = projected - resultPoint;
-			return displacement.squared_length() <= 0.001;
-		}
-
-		Kernel::FT lineLineIntersection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2) {
-			// Calculates the fraction of the distance between a1 and a2 the intersection occurs.
-			Kernel::Vector_3 av(a2.x() - a1.x(), a2.y() - a1.y(), a2.z() - a1.z());
-			Kernel::Vector_3 bv(b2.x() - b1.x(), b2.y() - b1.y(), b2.z() - b1.z());
-
-			// a + t*b = c + s*d, f + t*g = h + s*j
-			// t = (-a * j + c * j + d * f - d * h) / (b * j - d * g)
-
-			auto calculateDenominator = [](Kernel::FT v1p, Kernel::FT v1q, Kernel::FT v2p, Kernel::FT v2q) {
-				// b, g, d, j
-				// return b * j - d * g
-				return v1p * v2q - v2p * v1q;
-			};
-
-			auto calculateNumerator = [](Kernel::FT p1p, Kernel::FT p1q, Kernel::FT p2p, Kernel::FT p2q, Kernel::FT v2p, Kernel::FT v2q) {
-				// a, f, c, h, d, j
-				// return -a * j + c * j + d * f - d * h
-				return -p1p * v2q + p2p * v2q + v2p * p1q - v2p * p2q;
-			};
-
-			auto denominatorXY = calculateDenominator(av.x(), av.y(), bv.x(), bv.y());
-			auto denominatorXZ = calculateDenominator(av.x(), av.z(), bv.x(), bv.z());
-			auto denominatorYZ = calculateDenominator(av.y(), av.z(), bv.y(), bv.z());
-
-			auto denominatorXYAbs = std::abs(denominatorXY);
-			auto denominatorXZAbs = std::abs(denominatorXZ);
-			auto denominatorYZAbs = std::abs(denominatorYZ);
-
-			Kernel::FT t;
-
-			if (denominatorXYAbs >= denominatorXZAbs && denominatorXYAbs >= denominatorYZAbs) {
-				// Use XY
-				auto numerator = calculateNumerator(a1.x(), a1.y(), b1.x(), b1.y(), bv.x(), bv.y());
-				t = numerator / denominatorXY;
-			}
-			else if (denominatorXZAbs >= denominatorXYAbs && denominatorXZAbs >= denominatorYZAbs) {
-				// Use XZ
-				auto numerator = calculateNumerator(a1.x(), a1.z(), b1.x(), b1.z(), bv.x(), bv.z());
-				t = numerator / denominatorXZ;
-			}
-			else {
-				// Use YZ
-				auto numerator = calculateNumerator(a1.y(), a1.z(), b1.y(), b1.z(), bv.y(), bv.z());
-				t = numerator / denominatorYZ;
-			}
-			assert(checkLineLineIntersectionResult(t, a1, av, b1, bv));
+		Kernel::FT lineLineIntersectionWithDirection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2) {
+			Kernel::FT t = lineLineIntersection(a1, a2, b1, b2);
 
 			// Calculate s to see if it is negative.
 			// a + t*b = c + s*d
@@ -245,6 +192,8 @@ namespace MeshShortestPath {
 				return (p1 + t * v1 - p2) / v2;
 			};
 
+			Kernel::Vector_3 av(a2.x() - a1.x(), a2.y() - a1.y(), a2.z() - a1.z());
+			Kernel::Vector_3 bv(b2.x() - b1.x(), b2.y() - b1.y(), b2.z() - b1.z());
 			auto bvxAbs = std::abs(bv.x());
 			auto bvyAbs = std::abs(bv.y());
 			auto bvzAbs = std::abs(bv.z());
@@ -281,8 +230,8 @@ namespace MeshShortestPath {
 			auto newUnfoldedRoot = calculateUnfoldedRoot(interval.getUnfoldedRoot(), halfedge->facet()->plane(), opposite->facet()->plane(), Kernel::Line_3(halfedge->vertex()->point(), opposite->vertex()->point()));
 
 			auto project = [&](Polyhedron::Halfedge_handle halfedge) -> boost::optional<CandidateInterval> {
-				auto lowerScalar = lineLineIntersection(halfedge->opposite()->vertex()->point(), halfedge->vertex()->point(), newUnfoldedRoot, interval.getLowerExtent());
-				auto upperScalar = lineLineIntersection(halfedge->opposite()->vertex()->point(), halfedge->vertex()->point(), newUnfoldedRoot, interval.getUpperExtent());
+				auto lowerScalar = lineLineIntersectionWithDirection(halfedge->opposite()->vertex()->point(), halfedge->vertex()->point(), newUnfoldedRoot, interval.getLowerExtent());
+				auto upperScalar = lineLineIntersectionWithDirection(halfedge->opposite()->vertex()->point(), halfedge->vertex()->point(), newUnfoldedRoot, interval.getUpperExtent());
 				assert(upperScalar >= lowerScalar);
 				lowerScalar = std::min(std::max(lowerScalar, Kernel::FT(0)), Kernel::FT(1));
 				upperScalar = std::min(std::max(upperScalar, Kernel::FT(0)), Kernel::FT(1));
