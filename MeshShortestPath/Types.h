@@ -3,6 +3,7 @@
 #include <list>
 #include <vector>
 #include <memory>
+#include <functional>
 
 #define CGAL_CHECK_EXPENSIVE
 #include <CGAL/Simple_cartesian.h>
@@ -19,18 +20,13 @@ namespace MeshShortestPath {
 
 	class CandidateInterval;
 
-	struct InsertIntervalResult {
-		std::vector<std::list<CandidateInterval>::iterator> toRemove;
-		bool isFirstOrLastOnHalfedge;
-	};
-
-	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor);
+	boost::optional<bool> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval);
 
 	template <class Refs>
 	class HalfedgeWithIntervalVector : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 	public:
-		boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, const CandidateInterval& predecessor) {
-			return MeshShortestPath::insertInterval(interval, intervals, predecessor);
+		boost::optional<bool> insertInterval(std::list<CandidateInterval>::iterator interval, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
+			return MeshShortestPath::insertInterval(interval, intervals, predecessor, addCandidateInterval);
 		}
 
 		void insertInitialInterval(std::list<CandidateInterval>::iterator interval) {
@@ -78,7 +74,7 @@ namespace MeshShortestPath {
 		void setDeleted() { deleted = true; }
 
 	private:
-		friend boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor);
+		friend boost::optional<bool> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval);
 
 		struct AccessPoint {
 			Kernel::FT location;

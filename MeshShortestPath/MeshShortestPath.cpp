@@ -98,8 +98,10 @@ namespace MeshShortestPath {
 			}
 
 			void operator()(const FrontierPointEvent& event) const {
-				if (event.getCandidateInterval()->isDeleted())
+				if (event.getCandidateInterval()->isDeleted()) {
+					mmp.candidateIntervals.erase(event.getCandidateInterval());
 					return;
+				}
 
 				std::cout << "Encountering event with label " << event.getLabel() << std::endl;
 				// FIXME: Possibly label the event
@@ -127,12 +129,12 @@ namespace MeshShortestPath {
 						candidateIntervals.push_back(*candidateInterval);
 						auto iterator = candidateIntervals.end();
 						--iterator;
-						auto insertIntervalResult = candidateInterval->getHalfedge()->insertInterval(iterator, interval);
+						auto insertIntervalResult = candidateInterval->getHalfedge()->insertInterval(iterator, interval, [&](CandidateInterval candidateInterval) {
+							return candidateIntervals.insert(candidateIntervals.end(), candidateInterval);
+						});
 						if (insertIntervalResult) {
 							eventQueue.place(FrontierPointEvent(iterator)); // FIXME: Maybe add more things to the event queue
 							// FIXME: Check if the frontier point is a vertex
-							for (auto item : insertIntervalResult->toRemove)
-								item->setDeleted(); // The event queue has iterators into the candidateIntervals list, so we can't simply delete them without updating the event queue.
 						}
 						else
 							candidateIntervals.erase(iterator);

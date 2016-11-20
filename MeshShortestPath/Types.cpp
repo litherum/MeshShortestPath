@@ -24,7 +24,7 @@ namespace MeshShortestPath {
 		return begin;
 	}
 
-	boost::optional<InsertIntervalResult> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor) {
+	boost::optional<bool> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
 		CandidateInterval::AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval->getHalfedge()->next() };
 
 		auto searchComparison = [](const CandidateInterval::AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
@@ -51,10 +51,12 @@ namespace MeshShortestPath {
 		}
 
 		// FIXME: Figure out when we should be returning boost::none.
-		
-		InsertIntervalResult result;
-		std::copy(beginDeleting.base(), endDeleting, std::back_inserter(result.toRemove));
-		result.isFirstOrLastOnHalfedge = beginDeleting == intervals.rend() || endDeleting == intervals.end();
+
+		// The event queue has iterators into the candidateIntervals list, so we can't simply delete them without updating the event queue.
+		std::for_each(beginDeleting.base(), endDeleting, [](auto candidateInterval) {
+			candidateInterval->setDeleted();
+		});
+		bool result = beginDeleting == intervals.rend() || endDeleting == intervals.end();
 
 		auto toInsert = intervals.erase(beginDeleting.base(), endDeleting);
 		intervals.insert(toInsert, interval);
