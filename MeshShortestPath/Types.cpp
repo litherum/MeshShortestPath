@@ -20,19 +20,6 @@ namespace MeshShortestPath {
 		return (a * b) / (b * b);
 	}
 
-	template <typename T>
-	static T findEndOfDominatedIntervals(T begin, T end, Polyhedron::Point_3 (CandidateInterval::*extentFunction)() const, const CandidateInterval& interval) {
-		// FIXME: Only traverse inside of the target range (maybe this is unnecessary?)
-		while (begin != end) {
-			if (distanceBetweenPoints(((**begin).*extentFunction)(), (*begin)->getUnfoldedRoot()) + (*begin)->getDepth() >=
-				distanceBetweenPoints(((**begin).*extentFunction)(), interval.getUnfoldedRoot()) + interval.getDepth())
-				++begin;
-			else
-				break;
-		}
-		return begin;
-	}
-
 	static std::vector<Kernel::FT> quadraticFormula(Kernel::FT a, Kernel::FT b, Kernel::FT c) {
 		auto discriminant = b * b - 4 * a * c;
 		if (discriminant < 0)
@@ -120,8 +107,20 @@ namespace MeshShortestPath {
 
 		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
 
-		auto beginDeleting = findEndOfDominatedIntervals(std::make_reverse_iterator(location), intervals.rend(), &CandidateInterval::getLowerExtent, interval);
-		auto endDeleting = findEndOfDominatedIntervals(location, intervals.end(), &CandidateInterval::getUpperExtent, interval);
+		auto findEndOfDominatedIntervals = [&](auto begin, auto end, Polyhedron::Point_3(CandidateInterval::*extentFunction)() const) {
+			while (begin != end) {
+				if ((*begin)->lowerExtent >= interval.lowerExtent && (*begin)->upperExtent <= interval.upperExtent &&
+					distanceBetweenPoints(((**begin).*extentFunction)(), (*begin)->getUnfoldedRoot()) + (*begin)->getDepth() >=
+					distanceBetweenPoints(((**begin).*extentFunction)(), interval.getUnfoldedRoot()) + interval.getDepth())
+					++begin;
+				else
+					break;
+			}
+			return begin;
+		};
+
+		auto beginDeleting = findEndOfDominatedIntervals(std::make_reverse_iterator(location), intervals.rend(), &CandidateInterval::getLowerExtent);
+		auto endDeleting = findEndOfDominatedIntervals(location, intervals.end(), &CandidateInterval::getUpperExtent);
 		// These are pointing to the furthest item which should NOT be deleted.
 		// Calling base() on beginDeleting will make it point to the first item which SHOULD be deleted. (Or equal to endDeleting.)
 
