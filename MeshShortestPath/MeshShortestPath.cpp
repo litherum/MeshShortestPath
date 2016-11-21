@@ -200,8 +200,8 @@ namespace MeshShortestPath {
 				return (p1 + t * v1 - p2) / v2;
 			};
 
-			Kernel::Vector_3 av(a2.x() - a1.x(), a2.y() - a1.y(), a2.z() - a1.z());
-			Kernel::Vector_3 bv(b2.x() - b1.x(), b2.y() - b1.y(), b2.z() - b1.z());
+			auto av = a2 - a1;
+			auto bv = b2 - b1;
 			auto bvxAbs = std::abs(bv.x());
 			auto bvyAbs = std::abs(bv.y());
 			auto bvzAbs = std::abs(bv.z());

@@ -12,8 +12,17 @@ namespace MeshShortestPath {
 		return std::sqrt(Kernel::Vector_3(b.x() - a.x(), b.y() - a.y(), b.z() - a.z()).squared_length());
 	}
 
+	static Kernel::FT projectionScalar(Polyhedron::Halfedge_handle halfedge, Polyhedron::Point_3 point) {
+		auto source = halfedge->opposite()->vertex()->point();
+		auto destination = halfedge->vertex()->point();
+		auto b = destination - source;
+		auto a = point - source;
+		return (a * b) / (b * b);
+	}
+
 	template <typename T>
 	static T findEndOfDominatedIntervals(T begin, T end, Polyhedron::Point_3 (CandidateInterval::*extentFunction)() const, const CandidateInterval& interval) {
+		// FIXME: Only traverse inside of the target range
 		while (begin != end) {
 			if (distanceBetweenPoints(((**begin).*extentFunction)(), (*begin)->getUnfoldedRoot()) + (*begin)->getDepth() >=
 				distanceBetweenPoints(((**begin).*extentFunction)(), interval.getUnfoldedRoot()) + interval.getDepth())
@@ -64,11 +73,36 @@ namespace MeshShortestPath {
 		// 4d^2 * (ra + b1^2) = (m - 2*b*b1) ^ 2
 		// 4d^2 * (ra + b1^2) = m^2 - 4*m*b*b1 + 4*b^2*b1^2
 		// 0 = b1^2 * (4b^2 - 4d^2) + b1 * (-4mb) + (m^2 - 4d^2 * ra)
-		auto candidates = quadraticFormula(4 * b * b - 4 * d * d, -4 * m * b, m * m - 4 * d * d * ra);
-		std::vector<Kernel::FT> result;
-		std::copy_if(candidates.begin(), candidates.end(), std::back_inserter(result), [&](Kernel::FT b1) {
+		auto result = quadraticFormula(4 * b * b - 4 * d * d, -4 * m * b, m * m - 4 * d * d * ra);
+		auto endIterator = std::copy_if(result.begin(), result.end(), result.begin(), [&](Kernel::FT b1) {
 			return (rb + (b - b1) * (b - b1) - d * d - ra - b1 * b1) / (2 * d) >= 0 &&
 				d + sqrt(ra + b1 *b1) >= 0;
+		});
+		result.erase(endIterator, result.end());
+		return result;
+	}
+
+	std::vector<Kernel::FT> calculateTiePoints(const CandidateInterval& a, const CandidateInterval& b) {
+		assert(a.getHalfedge() == b.getHalfedge());
+		auto halfedge = a.getHalfedge();
+		auto source = halfedge->opposite()->vertex()->point();
+		auto destination = halfedge->vertex()->point();
+		auto vector = destination - source;
+
+		auto d1 = a.getDepth();
+		auto projectionScalarA = projectionScalar(halfedge, a.getUnfoldedRoot());
+		auto closestApproachA = source + projectionScalarA * vector;
+		auto r1 = distanceBetweenPoints(a.getUnfoldedRoot(), closestApproachA);
+		auto projectionScalarB = projectionScalar(halfedge, b.getUnfoldedRoot());
+		auto closestApproachB = source + projectionScalarB * vector;
+		auto distance = distanceBetweenPoints(closestApproachA, closestApproachB);
+		auto d2 = b.getDepth();
+		auto r2 = distanceBetweenPoints(b.getUnfoldedRoot(), closestApproachB);
+
+		auto result = calculateTiePoints(d1, r1, distance, d2, r2);
+		// The result is distances, but we need scalar multipliers
+		std::transform(result.begin(), result.end(), result.begin(), [&](Kernel::FT tiePointDistance) {
+			return projectionScalarA + distance / std::sqrt(vector.squared_length());
 		});
 		return result;
 	}
@@ -127,12 +161,7 @@ namespace MeshShortestPath {
 		assert(lowerExtent <= upperExtent);
 		assert(lowerExtent >= 0);
 		assert(upperExtent <= 1);
-		auto destination = halfedge->vertex()->point();
-		auto source = halfedge->opposite()->vertex()->point();
-		// Project unfoldedRoot onto the line from source to destination
-		Kernel::Vector_3 a(unfoldedRoot.x() - source.x(), unfoldedRoot.y() - source.y(), unfoldedRoot.z() - source.z());
-		Kernel::Vector_3 b(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
-		frontierPoint = (a * b) / (b * b);
+		frontierPoint = projectionScalar(halfedge, unfoldedRoot);
 
 		// FIXME: Provide some more resilient way to test for frontier points coincident with vertices
 		if (frontierPoint <= lowerExtent) {
@@ -169,28 +198,28 @@ namespace MeshShortestPath {
 	Kernel::Point_3 CandidateInterval::getFrontierPoint() const {
 		auto destination = halfedge->vertex()->point();
 		auto source = halfedge->opposite()->vertex()->point();
-		Kernel::Vector_3 s(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
+		auto s = destination - source;
 		return source + frontierPoint * s;
 	}
 
 	Kernel::Point_3 CandidateInterval::getLowerExtent() const {
 		auto destination = halfedge->vertex()->point();
 		auto source = halfedge->opposite()->vertex()->point();
-		Kernel::Vector_3 s(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
+		auto s = destination - source;
 		return source + lowerExtent * s;
 	}
 
 	Kernel::Point_3 CandidateInterval::getUpperExtent() const {
 		auto destination = halfedge->vertex()->point();
 		auto source = halfedge->opposite()->vertex()->point();
-		Kernel::Vector_3 s(destination.x() - source.x(), destination.y() - source.y(), destination.z() - source.z());
+		auto s = destination - source;
 		return source + upperExtent * s;
 	}
 
 	// Precondition: Point is part of the candidate interval.
 	static Kernel::FT computeLabel(Kernel::Point_3 point, const CandidateInterval& candidateInterval) {
 		auto unfoldedRoot = candidateInterval.getUnfoldedRoot();
-		Kernel::Vector_3 displacement(point.x() - unfoldedRoot.x(), point.y() - unfoldedRoot.y(), point.z() - unfoldedRoot.z());
+		auto displacement = point - unfoldedRoot;
 		return std::sqrt(displacement.squared_length()) + candidateInterval.getDepth();
 	}
 
@@ -245,8 +274,8 @@ namespace MeshShortestPath {
 
 	Kernel::FT lineLineIntersection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2) {
 		// Calculates the fraction of the distance between a1 and a2 the intersection occurs.
-		Kernel::Vector_3 av(a2.x() - a1.x(), a2.y() - a1.y(), a2.z() - a1.z());
-		Kernel::Vector_3 bv(b2.x() - b1.x(), b2.y() - b1.y(), b2.z() - b1.z());
+		auto av = a2 - a1;
+		auto bv = b2 - b1;
 
 		// a + t*b = c + s*d, f + t*g = h + s*j
 		// t = (-a * j + c * j + d * f - d * h) / (b * j - d * g)
