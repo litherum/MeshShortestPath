@@ -126,19 +126,11 @@ namespace MeshShortestPath {
 
 				for (auto& candidateInterval : projected) {
 					if (candidateInterval) {
-						candidateIntervals.push_back(*candidateInterval);
-						auto iterator = candidateIntervals.end();
-						--iterator;
-						auto insertIntervalResult = candidateInterval->getHalfedge()->insertInterval(iterator, interval, [&](CandidateInterval candidateInterval) {
-							// FIXME: Possibly (maybe always?) add the candidateInterval to the event queue
-							return candidateIntervals.insert(candidateIntervals.end(), candidateInterval);
+						candidateInterval->getHalfedge()->insertInterval(*candidateInterval, interval, [&](CandidateInterval candidateInterval) {
+							auto result = candidateIntervals.insert(candidateIntervals.end(), candidateInterval);
+							eventQueue.place(FrontierPointEvent(result));
+							return result;
 						});
-						if (insertIntervalResult) {
-							eventQueue.place(FrontierPointEvent(iterator)); // FIXME: Maybe add more things to the event queue
-							// FIXME: Check if the frontier point is a vertex
-						}
-						else
-							candidateIntervals.erase(iterator);
 					}
 				}
 			}

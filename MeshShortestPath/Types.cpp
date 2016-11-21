@@ -107,8 +107,8 @@ namespace MeshShortestPath {
 		return result;
 	}
 
-	boost::optional<bool> insertInterval(std::list<CandidateInterval>::iterator interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
-		CandidateInterval::AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval->getHalfedge()->next() };
+	void insertInterval(CandidateInterval& interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
+		CandidateInterval::AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next() };
 
 		auto searchComparison = [](const CandidateInterval::AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
 			if (existing->accessPoint.initialSide && !probe.initialSide)
@@ -120,11 +120,12 @@ namespace MeshShortestPath {
 
 		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
 
-		auto beginDeleting = findEndOfDominatedIntervals(std::make_reverse_iterator(location), intervals.rend(), &CandidateInterval::getLowerExtent, *interval);
-		auto endDeleting = findEndOfDominatedIntervals(location, intervals.end(), &CandidateInterval::getUpperExtent, *interval);
+		auto beginDeleting = findEndOfDominatedIntervals(std::make_reverse_iterator(location), intervals.rend(), &CandidateInterval::getLowerExtent, interval);
+		auto endDeleting = findEndOfDominatedIntervals(location, intervals.end(), &CandidateInterval::getUpperExtent, interval);
 		// These are pointing to the furthest item which should NOT be deleted.
 		// Calling base() on beginDeleting will make it point to the first item which SHOULD be deleted. (Or equal to endDeleting.)
 
+		// "Left and "right" are in reference to a halfedge which points to the right. (--------->)
 		boost::optional<Kernel::FT> leftTrimPoint;
 		boost::optional<Kernel::FT> rightTrimPoint;
 
@@ -144,18 +145,21 @@ namespace MeshShortestPath {
 		};
 
 		if (beginDeleting != intervals.rend()) {
-			if (auto trimPoint = calculateTrimPoints(**beginDeleting, *interval))
+			if (auto trimPoint = calculateTrimPoints(**beginDeleting, interval))
 				leftTrimPoint = trimPoint;
 			else
-				return boost::none;
+				return;
 		}
 
 		if (endDeleting != intervals.end()) {
-			if (auto trimPoint = calculateTrimPoints(*interval, **endDeleting))
+			if (auto trimPoint = calculateTrimPoints(interval, **endDeleting))
 				rightTrimPoint = trimPoint;
 			else
-				return boost::none;
+				return;
 		}
+
+		if (leftTrimPoint && rightTrimPoint && *leftTrimPoint > *rightTrimPoint)
+			return;
 
 		// Ready to go! Let's start modifying things.
 
@@ -221,28 +225,26 @@ namespace MeshShortestPath {
 
 		insertLocation = trimRightNeighbor(insertLocation);
 
-		if ((rightTrimPoint && interval->frontierPoint > *rightTrimPoint) ||
-			(leftTrimPoint && interval->frontierPoint < *leftTrimPoint)) {
-			CandidateInterval newInterval = *interval;
+		if ((rightTrimPoint && interval.frontierPoint > *rightTrimPoint) ||
+			(leftTrimPoint && interval.frontierPoint < *leftTrimPoint)) {
+			CandidateInterval newInterval = interval;
 			if (rightTrimPoint && leftTrimPoint)
 				newInterval = trimLeftSide(trimRightSide(newInterval, *rightTrimPoint), *leftTrimPoint);
 			else if (rightTrimPoint)
 				newInterval = trimRightSide(newInterval, *rightTrimPoint);
 			else if (leftTrimPoint)
 				newInterval = trimLeftSide(newInterval, *leftTrimPoint);
-			interval->setDeleted();
 			auto addedInterval = addCandidateInterval(newInterval);
 			intervals.insert(insertLocation, addedInterval);
 		}
 		else {
 			if (leftTrimPoint)
-				interval->lowerExtent = *leftTrimPoint;
+				interval.lowerExtent = *leftTrimPoint;
 			if (rightTrimPoint)
-				interval->upperExtent = *rightTrimPoint;
-			intervals.insert(insertLocation, interval);
+				interval.upperExtent = *rightTrimPoint;
+			auto addedInterval = addCandidateInterval(interval);
+			intervals.insert(insertLocation, addedInterval);
 		}
-
-		return result;
 	}
 
 	CandidateInterval::CandidateInterval(
