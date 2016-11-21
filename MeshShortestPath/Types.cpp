@@ -22,7 +22,7 @@ namespace MeshShortestPath {
 
 	template <typename T>
 	static T findEndOfDominatedIntervals(T begin, T end, Polyhedron::Point_3 (CandidateInterval::*extentFunction)() const, const CandidateInterval& interval) {
-		// FIXME: Only traverse inside of the target range
+		// FIXME: Only traverse inside of the target range (maybe this is unnecessary?)
 		while (begin != end) {
 			if (distanceBetweenPoints(((**begin).*extentFunction)(), (*begin)->getUnfoldedRoot()) + (*begin)->getDepth() >=
 				distanceBetweenPoints(((**begin).*extentFunction)(), interval.getUnfoldedRoot()) + interval.getDepth())
@@ -122,18 +122,42 @@ namespace MeshShortestPath {
 
 		auto beginDeleting = findEndOfDominatedIntervals(std::make_reverse_iterator(location), intervals.rend(), &CandidateInterval::getLowerExtent, *interval);
 		auto endDeleting = findEndOfDominatedIntervals(location, intervals.end(), &CandidateInterval::getUpperExtent, *interval);
+		// These are pointing to the furthest item which should NOT be deleted.
+		// Calling base() on beginDeleting will make it point to the first item which SHOULD be deleted. (Or equal to endDeleting.)
+
+		boost::optional<Kernel::FT> leftTrimPoint;
+		boost::optional<Kernel::FT> rightTrimPoint;
+
+		auto calculateTrimPoints = [](const CandidateInterval& a, const CandidateInterval& b) -> boost::optional<Kernel::FT> {
+			auto tiePoints = calculateTiePoints(a, b);
+			auto endIterator = std::copy_if(tiePoints.begin(), tiePoints.end(), tiePoints.begin(), [&](Kernel::FT scalar) {
+				return scalar >= a.lowerExtent && scalar >= a.upperExtent &&
+					scalar >= b.lowerExtent && scalar <= b.upperExtent;
+			});
+			tiePoints.erase(endIterator, tiePoints.end());
+			if (tiePoints.empty())
+				return boost::none;
+			else {
+				assert(tiePoints.size() == 1);
+				return tiePoints[0];
+			}
+		};
 
 		if (beginDeleting != intervals.rend()) {
-			// FIXME: Trim *beginDeleting and interval.
-			// Modifying the extents may require recomputation of the frontier point and access point.
+			if (auto trimPoint = calculateTrimPoints(**beginDeleting, *interval))
+				leftTrimPoint = trimPoint;
+			else
+				return boost::none;
 		}
 
 		if (endDeleting != intervals.end()) {
-			// FIXME: Trim *endDeleting and interval.
-			// Modifying the extents may require recomputation of the frontier point and access point.
+			if (auto trimPoint = calculateTrimPoints(*interval, **endDeleting))
+				rightTrimPoint = trimPoint;
+			else
+				return boost::none;
 		}
 
-		// FIXME: Figure out when we should be returning boost::none.
+		// Ready to go! Let's start modifying things.
 
 		// The event queue has iterators into the candidateIntervals list, so we can't simply delete them without updating the event queue.
 		std::for_each(beginDeleting.base(), endDeleting, [](auto candidateInterval) {
@@ -141,8 +165,82 @@ namespace MeshShortestPath {
 		});
 		bool result = beginDeleting == intervals.rend() || endDeleting == intervals.end();
 
-		auto toInsert = intervals.erase(beginDeleting.base(), endDeleting);
-		intervals.insert(toInsert, interval);
+		auto insertLocation = intervals.erase(beginDeleting.base(), endDeleting);
+
+		auto trimRightSide = [](const CandidateInterval& interval, Kernel::FT location) {
+			return CandidateInterval(interval.getHalfedge(), interval.getUnfoldedRoot(), interval.getDepth(), interval.lowerExtent, location);
+		};
+
+		auto trimLeftSide = [](const CandidateInterval& interval, Kernel::FT location) {
+			return CandidateInterval(interval.getHalfedge(), interval.getUnfoldedRoot(), interval.getDepth(), location, interval.upperExtent);
+		};
+
+		auto trimLeftNeighbor = [&](std::vector<std::list<CandidateInterval>::iterator>::iterator location) {
+			if (!leftTrimPoint)
+				return location;
+
+			auto leftNeighbor = location;
+			--leftNeighbor;
+
+			if ((*leftNeighbor)->frontierPoint > *leftTrimPoint) {
+				(*leftNeighbor)->setDeleted();
+				auto newLeftSide = trimRightSide(**leftNeighbor, *leftTrimPoint);
+				auto addedLeftSide = addCandidateInterval(newLeftSide);
+				auto insertLocation = intervals.erase(leftNeighbor);
+				auto result = intervals.insert(insertLocation, addedLeftSide);
+				++result;
+				return result;
+			}
+			else {
+				(*leftNeighbor)->upperExtent = *leftTrimPoint;
+				return location;
+			}
+		};
+
+		insertLocation = trimLeftNeighbor(insertLocation);
+
+		auto trimRightNeighbor = [&](std::vector<std::list<CandidateInterval>::iterator>::iterator location) {
+			if (!rightTrimPoint)
+				return location;
+
+			auto rightNeighbor = location;
+
+			if ((*rightNeighbor)->frontierPoint < *rightTrimPoint) {
+				(*rightNeighbor)->setDeleted();
+				auto newRightSide = trimLeftSide(**rightNeighbor, *rightTrimPoint);
+				auto addedRightSide = addCandidateInterval(newRightSide);
+				auto insertLocation = intervals.erase(rightNeighbor);
+				auto result = intervals.insert(insertLocation, addedRightSide);
+				return result;
+			}
+			else {
+				(*rightNeighbor)->lowerExtent = *rightTrimPoint;
+				return location;
+			}
+		};
+
+		insertLocation = trimRightNeighbor(insertLocation);
+
+		if ((rightTrimPoint && interval->frontierPoint > *rightTrimPoint) ||
+			(leftTrimPoint && interval->frontierPoint < *leftTrimPoint)) {
+			CandidateInterval newInterval = *interval;
+			if (rightTrimPoint && leftTrimPoint)
+				newInterval = trimLeftSide(trimRightSide(newInterval, *rightTrimPoint), *leftTrimPoint);
+			else if (rightTrimPoint)
+				newInterval = trimRightSide(newInterval, *rightTrimPoint);
+			else if (leftTrimPoint)
+				newInterval = trimLeftSide(newInterval, *leftTrimPoint);
+			interval->setDeleted();
+			auto addedInterval = addCandidateInterval(newInterval);
+			intervals.insert(insertLocation, addedInterval);
+		}
+		else {
+			if (leftTrimPoint)
+				interval->lowerExtent = *leftTrimPoint;
+			if (rightTrimPoint)
+				interval->upperExtent = *rightTrimPoint;
+			intervals.insert(insertLocation, interval);
+		}
 
 		return result;
 	}
