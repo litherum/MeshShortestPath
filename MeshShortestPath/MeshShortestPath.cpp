@@ -20,10 +20,6 @@
 
 namespace MeshShortestPath {
 
-	static void printPoint(std::ostream& stream, Polyhedron::Point point) {
-		stream << "(" << point.x() << ", " << point.y() << ", " << point.z() << ")";
-	}
-
 	template <typename T>
 	static void iterateHalfedges(Polyhedron::Facet_handle facet, T callback) {
 		auto halfedge = facet->halfedge();
@@ -180,8 +176,11 @@ namespace MeshShortestPath {
 			}
 		}
 
-		Kernel::FT lineLineIntersectionWithDirection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2) {
-			Kernel::FT t = lineLineIntersection(a1, a2, b1, b2);
+		static boost::optional<Kernel::FT> lineLineIntersectionWithDirection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2) {
+			auto intersection = lineLineIntersection(a1, a2, b1, b2);
+			if (!intersection)
+				return boost::none;
+			Kernel::FT t = *intersection;
 
 			// Calculate s to see if it is negative.
 			// a + t*b = c + s*d
@@ -230,13 +229,28 @@ namespace MeshShortestPath {
 			auto newUnfoldedRoot = calculateUnfoldedRoot(interval.getUnfoldedRoot(), halfedge->facet()->plane(), opposite->facet()->plane(), Kernel::Line_3(halfedge->vertex()->point(), opposite->vertex()->point()));
 
 			auto project = [&](Polyhedron::Halfedge_handle halfedge) -> boost::optional<CandidateInterval> {
-				auto lowerScalar = lineLineIntersectionWithDirection(halfedge->opposite()->vertex()->point(), halfedge->vertex()->point(), newUnfoldedRoot, interval.getLowerExtent());
-				auto upperScalar = lineLineIntersectionWithDirection(halfedge->opposite()->vertex()->point(), halfedge->vertex()->point(), newUnfoldedRoot, interval.getUpperExtent());
-				assert(upperScalar >= lowerScalar);
-				lowerScalar = std::min(std::max(lowerScalar, Kernel::FT(0)), Kernel::FT(1));
-				upperScalar = std::min(std::max(upperScalar, Kernel::FT(0)), Kernel::FT(1));
+				auto source = halfedge->opposite()->vertex()->point();
+				auto destination = halfedge->vertex()->point();
+				auto lowerScalar = lineLineIntersectionWithDirection(source, destination, newUnfoldedRoot, interval.getLowerExtent());
+				auto upperScalar = lineLineIntersectionWithDirection(source, destination, newUnfoldedRoot, interval.getUpperExtent());
+				if (!lowerScalar) {
+					assert(upperScalar);
+					if ((destination - source) * (interval.getLowerExtent() - newUnfoldedRoot) > 0)
+						lowerScalar = std::numeric_limits<Kernel::FT>::infinity();
+					else
+						lowerScalar = -std::numeric_limits<Kernel::FT>::infinity();
+				}
+				if (!upperScalar) {
+					assert(lowerScalar);
+					if ((destination - source) * (interval.getUpperExtent() - newUnfoldedRoot) > 0)
+						upperScalar = std::numeric_limits<Kernel::FT>::infinity();
+					else
+						upperScalar = -std::numeric_limits<Kernel::FT>::infinity();
+				}
+				*lowerScalar = std::min(std::max(*lowerScalar, Kernel::FT(0)), Kernel::FT(1));
+				*upperScalar = std::min(std::max(*upperScalar, Kernel::FT(0)), Kernel::FT(1));
 				if (upperScalar > lowerScalar)
-					return CandidateInterval(halfedge, newUnfoldedRoot, interval.getDepth(), lowerScalar, upperScalar);
+					return CandidateInterval(halfedge, newUnfoldedRoot, interval.getDepth(), *lowerScalar, *upperScalar);
 				else
 					return boost::none;
 			};

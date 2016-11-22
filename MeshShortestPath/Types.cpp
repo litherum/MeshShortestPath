@@ -8,6 +8,10 @@
 
 namespace MeshShortestPath {
 
+	void printPoint(std::ostream& stream, Polyhedron::Point point) {
+		stream << "(" << point.x() << ", " << point.y() << ", " << point.z() << ")";
+	}
+
 	static Kernel::FT distanceBetweenPoints(Polyhedron::Point_3 a, Polyhedron::Point_3 b) {
 		return std::sqrt(Kernel::Vector_3(b.x() - a.x(), b.y() - a.y(), b.z() - a.z()).squared_length());
 	}
@@ -262,6 +266,14 @@ namespace MeshShortestPath {
 		assert(upperExtent <= 1);
 		frontierPoint = projectionScalar(halfedge, unfoldedRoot);
 
+		auto source = halfedge->opposite()->vertex()->point();
+		auto destination = halfedge->vertex()->point();
+		std::cout << "Candidate Interval on halfedge ";
+		printPoint(std::cout, source);
+		std::cout << " -> ";
+		printPoint(std::cout, destination);
+		std::cout << " frontierPoint: " << frontierPoint << std::endl;
+
 		// FIXME: Provide some more resilient way to test for frontier points coincident with vertices
 		if (frontierPoint <= lowerExtent) {
 			frontierPoint = lowerExtent;
@@ -277,21 +289,28 @@ namespace MeshShortestPath {
 
 	auto CandidateInterval::calculateAccessPoint() const -> AccessPoint {
 		auto initialSideFraction = lineLineIntersection(halfedge->vertex()->point(), halfedge->next()->vertex()->point(), unfoldedRoot, getFrontierPoint());
-		if (initialSideFraction > 1 || initialSideFraction < 0) {
+		if (!initialSideFraction || *initialSideFraction > 1 || *initialSideFraction < 0) {
 			auto secondarySideFraction = lineLineIntersection(halfedge->next()->vertex()->point(), halfedge->next()->next()->vertex()->point(), unfoldedRoot, getFrontierPoint());
-			if (secondarySideFraction > 1 || secondarySideFraction < 0) {
-				auto initialSideDistance = std::min(std::abs(initialSideFraction), std::abs(initialSideFraction - 1));
-				auto secondarySideDistance = std::min(std::abs(secondarySideFraction), std::abs(secondarySideFraction - 1));
-				if (initialSideDistance < secondarySideDistance)
-					return { std::min(std::max(initialSideFraction, Kernel::FT(0)), Kernel::FT(1)), true };
+			if (!initialSideFraction && secondarySideFraction)
+				return { std::min(std::max(*secondarySideFraction, Kernel::FT(0)), Kernel::FT(1)), false };
+			else if (initialSideFraction && !secondarySideFraction)
+				return { std::min(std::max(*initialSideFraction, Kernel::FT(0)), Kernel::FT(1)), true };
+			else {
+				assert(initialSideFraction && secondarySideFraction);
+				if (*secondarySideFraction > 1 || *secondarySideFraction < 0) {
+					auto initialSideDistance = std::min(std::abs(*initialSideFraction), std::abs(*initialSideFraction - 1));
+					auto secondarySideDistance = std::min(std::abs(*secondarySideFraction), std::abs(*secondarySideFraction - 1));
+					if (initialSideDistance < secondarySideDistance)
+						return { std::min(std::max(*initialSideFraction, Kernel::FT(0)), Kernel::FT(1)), true };
+					else
+						return { std::min(std::max(*secondarySideFraction, Kernel::FT(0)), Kernel::FT(1)), false };
+				}
 				else
-					return { std::min(std::max(secondarySideFraction, Kernel::FT(0)), Kernel::FT(1)), false };
+					return { *secondarySideFraction, false };
 			}
-			else
-				return { secondarySideFraction, false };
 		}
 		else
-			return { initialSideFraction, true };
+			return { *initialSideFraction, true };
 	}
 
 	Kernel::Point_3 CandidateInterval::getFrontierPoint() const {
@@ -371,7 +390,7 @@ namespace MeshShortestPath {
 		return displacement.squared_length() <= 0.001;
 	}
 
-	Kernel::FT lineLineIntersection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2) {
+	boost::optional<Kernel::FT> lineLineIntersection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2) {
 		// Calculates the fraction of the distance between a1 and a2 the intersection occurs.
 		auto av = a2 - a1;
 		auto bv = b2 - b1;
@@ -394,6 +413,9 @@ namespace MeshShortestPath {
 		auto denominatorXY = calculateDenominator(av.x(), av.y(), bv.x(), bv.y());
 		auto denominatorXZ = calculateDenominator(av.x(), av.z(), bv.x(), bv.z());
 		auto denominatorYZ = calculateDenominator(av.y(), av.z(), bv.y(), bv.z());
+
+		if (denominatorXY == 0 && denominatorXZ == 0 && denominatorYZ == 0)
+			return boost::none;
 
 		auto denominatorXYAbs = std::abs(denominatorXY);
 		auto denominatorXZAbs = std::abs(denominatorXZ);
