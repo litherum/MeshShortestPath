@@ -141,4 +141,5 @@ namespace MeshShortestPath {
 
 	boost::optional<Kernel::FT> lineLineIntersection(Polyhedron::Point_3 a1, Polyhedron::Point_3 a2, Polyhedron::Point_3 b1, Polyhedron::Point_3 b2);
 	void printPoint(std::ostream&, Polyhedron::Point);
+	void printHalfedge(std::ostream&, Polyhedron::Halfedge_handle);
 }

@@ -12,6 +12,12 @@ namespace MeshShortestPath {
 		stream << "(" << point.x() << ", " << point.y() << ", " << point.z() << ")";
 	}
 
+	void printHalfedge(std::ostream& stream, Polyhedron::Halfedge_handle halfedge) {
+		printPoint(stream, halfedge->opposite()->vertex()->point());
+		stream << " -> ";
+		printPoint(stream, halfedge->vertex()->point());
+	}
+
 	static Kernel::FT distanceBetweenPoints(Polyhedron::Point_3 a, Polyhedron::Point_3 b) {
 		return std::sqrt(Kernel::Vector_3(b.x() - a.x(), b.y() - a.y(), b.z() - a.z()).squared_length());
 	}
@@ -266,14 +272,6 @@ namespace MeshShortestPath {
 		assert(upperExtent <= 1);
 		frontierPoint = projectionScalar(halfedge, unfoldedRoot);
 
-		auto source = halfedge->opposite()->vertex()->point();
-		auto destination = halfedge->vertex()->point();
-		std::cout << "Candidate Interval on halfedge ";
-		printPoint(std::cout, source);
-		std::cout << " -> ";
-		printPoint(std::cout, destination);
-		std::cout << " frontierPoint: " << frontierPoint << std::endl;
-
 		// FIXME: Provide some more resilient way to test for frontier points coincident with vertices
 		if (frontierPoint <= lowerExtent) {
 			frontierPoint = lowerExtent;
@@ -285,6 +283,12 @@ namespace MeshShortestPath {
 		}
 
 		accessPoint = calculateAccessPoint();
+
+		std::cout << "Constructing Candidate Interval on halfedge ";
+		printHalfedge(std::cout, halfedge);
+		std::cout << " frontierPoint: " << frontierPoint << " accessPoint: " << (accessPoint.initialSide ? "initialSide" : "secondarySide") << " " << accessPoint.location << std::endl;
+
+		std::cout << "";
 	}
 
 	auto CandidateInterval::calculateAccessPoint() const -> AccessPoint {
@@ -414,12 +418,12 @@ namespace MeshShortestPath {
 		auto denominatorXZ = calculateDenominator(av.x(), av.z(), bv.x(), bv.z());
 		auto denominatorYZ = calculateDenominator(av.y(), av.z(), bv.y(), bv.z());
 
-		if (denominatorXY == 0 && denominatorXZ == 0 && denominatorYZ == 0)
-			return boost::none;
-
 		auto denominatorXYAbs = std::abs(denominatorXY);
 		auto denominatorXZAbs = std::abs(denominatorXZ);
 		auto denominatorYZAbs = std::abs(denominatorYZ);
+
+		if (denominatorXYAbs < 0.0000001 && denominatorXZAbs < 0.0000001 && denominatorYZAbs < 0.0000001)
+			return boost::none;
 
 		Kernel::FT t;
 

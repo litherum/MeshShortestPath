@@ -99,13 +99,20 @@ namespace MeshShortestPath {
 					return;
 				}
 
-				std::cout << "Encountering event with label " << event.getLabel() << std::endl;
+				std::cout << "Encountering FrontierPoint event with label " << event.getLabel() << " on halfedge ";
+				printHalfedge(std::cout, event.getCandidateInterval()->getHalfedge());
+				std::cout << " with extents ";
+				printPoint(std::cout, event.getCandidateInterval()->getLowerExtent());
+				std::cout << " -> ";
+				printPoint(std::cout, event.getCandidateInterval()->getUpperExtent());
+				std::cout << std::endl;
+
 				// FIXME: Possibly label the event
 				mmp.propagate(*event.getCandidateInterval());
 			}
 
 			void operator()(const EndPointEvent& event) const {
-				std::cout << "Encountering event with label " << event.getLabel() << std::endl;
+				std::cout << "Encountering EndPoint event with label " << event.getLabel() << std::endl;
 				// FIXME: Possibly label the event
 			}
 
@@ -133,14 +140,6 @@ namespace MeshShortestPath {
 		}
 
 		Polyhedron::Point_3 calculateUnfoldedRoot(Polyhedron::Point_3 oldUnfoldedRoot, Polyhedron::Plane_3 originalPlane, Polyhedron::Plane_3 newPlane, Kernel::Line_3 intersection) {
-			std::cout << "Calculating unfolded root between two planes: " << std::endl;
-			std::cout << originalPlane << std::endl;
-			std::cout << newPlane << std::endl;
-			std::cout << intersection << std::endl;
-			std::cout << oldUnfoldedRoot << std::endl;
-			std::cout << "End of dump" << std::endl;
-
-
 			auto originalNormal = originalPlane.orthogonal_vector();
 			originalNormal = originalNormal / std::sqrt(originalNormal.squared_length());
 
@@ -223,8 +222,13 @@ namespace MeshShortestPath {
 			auto nextnext = next->next();
 			assert(nextnext->next() == opposite);
 
-			std::cout << "Projecting halfedge " << opposite->vertex()->point() << " " << halfedge->vertex()->point() << std::endl;
-			std::cout << "Onto " << next->vertex()->point() << std::endl;
+			std::cout << "Projecting halfedge ";
+			printHalfedge(std::cout, interval.getHalfedge());
+			std::cout << " onto ";
+			printHalfedge(std::cout, interval.getHalfedge()->opposite()->next());
+			std::cout << " and ";
+			printHalfedge(std::cout, interval.getHalfedge()->opposite()->next()->next());
+			std::cout << std::endl;
 
 			auto newUnfoldedRoot = calculateUnfoldedRoot(interval.getUnfoldedRoot(), halfedge->facet()->plane(), opposite->facet()->plane(), Kernel::Line_3(halfedge->vertex()->point(), opposite->vertex()->point()));
 
