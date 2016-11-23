@@ -105,14 +105,20 @@ namespace MeshShortestPath {
 	}
 
 	void insertInterval(CandidateInterval& interval, std::vector<std::list<CandidateInterval>::iterator>& intervals, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
-		CandidateInterval::AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next()->next() };
+		CandidateInterval::AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next() };
+
+		std::cout << "Inserting an interval into halfedge ";
+		printHalfedge(std::cout, interval.getHalfedge());
+		std::cout << " with predecessor ";
+		printHalfedge(std::cout, predecessor.getHalfedge());
+		std::cout << " and frontierPoint " << predecessor.frontierPoint << std::endl;
 
 		auto searchComparison = [](const CandidateInterval::AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
 			if (existing->accessPoint.initialSide && !probe.initialSide)
-				return true;
-			if (!existing->accessPoint.initialSide && probe.initialSide)
 				return false;
-			return existing->accessPoint.location < probe.location;
+			if (!existing->accessPoint.initialSide && probe.initialSide)
+				return true;
+			return existing->accessPoint.location > probe.location;
 		};
 
 		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
