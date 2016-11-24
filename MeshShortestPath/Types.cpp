@@ -19,7 +19,7 @@ namespace MeshShortestPath {
 	}
 
 	static Kernel::FT distanceBetweenPoints(Polyhedron::Point_3 a, Polyhedron::Point_3 b) {
-		return std::sqrt(Kernel::Vector_3(b.x() - a.x(), b.y() - a.y(), b.z() - a.z()).squared_length());
+		return std::sqrt((b - a).squared_length());
 	}
 
 	static Kernel::FT projectionScalar(Polyhedron::Halfedge_handle halfedge, Polyhedron::Point_3 point) {
