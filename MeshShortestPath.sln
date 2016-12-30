@@ -5,22 +5,60 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MeshShortestPath", "MeshShortestPath\MeshShortestPath.vcxproj", "{580A297F-ED52-46FE-B91F-23A30A273B1A}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MMP", "MMP\MMP.vcxproj", "{E32026A4-FAC0-40E2-A19A-80C46ACA6281}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Viewer", "Viewer\Viewer.vcxproj", "{763C2569-2EB0-49E1-BC86-E3E0ADF06533}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|ARM = Debug|ARM
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		Release|ARM = Release|ARM
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Debug|ARM.ActiveCfg = Debug|Win32
 		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Debug|x64.ActiveCfg = Debug|x64
 		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Debug|x64.Build.0 = Debug|x64
 		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Debug|x86.ActiveCfg = Debug|Win32
 		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Debug|x86.Build.0 = Debug|Win32
+		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Release|ARM.ActiveCfg = Release|Win32
 		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Release|x64.ActiveCfg = Release|x64
 		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Release|x64.Build.0 = Release|x64
 		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Release|x86.ActiveCfg = Release|Win32
 		{580A297F-ED52-46FE-B91F-23A30A273B1A}.Release|x86.Build.0 = Release|Win32
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Debug|ARM.ActiveCfg = Debug|ARM
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Debug|ARM.Build.0 = Debug|ARM
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Debug|x64.ActiveCfg = Debug|x64
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Debug|x64.Build.0 = Debug|x64
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Debug|x86.ActiveCfg = Debug|Win32
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Debug|x86.Build.0 = Debug|Win32
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Release|ARM.ActiveCfg = Release|ARM
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Release|ARM.Build.0 = Release|ARM
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Release|x64.ActiveCfg = Release|x64
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Release|x64.Build.0 = Release|x64
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Release|x86.ActiveCfg = Release|Win32
+		{E32026A4-FAC0-40E2-A19A-80C46ACA6281}.Release|x86.Build.0 = Release|Win32
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Debug|ARM.ActiveCfg = Debug|ARM
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Debug|ARM.Build.0 = Debug|ARM
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Debug|ARM.Deploy.0 = Debug|ARM
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Debug|x64.ActiveCfg = Debug|x64
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Debug|x64.Build.0 = Debug|x64
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Debug|x64.Deploy.0 = Debug|x64
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Debug|x86.ActiveCfg = Debug|Win32
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Debug|x86.Build.0 = Debug|Win32
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Debug|x86.Deploy.0 = Debug|Win32
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Release|ARM.ActiveCfg = Release|ARM
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Release|ARM.Build.0 = Release|ARM
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Release|ARM.Deploy.0 = Release|ARM
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Release|x64.ActiveCfg = Release|x64
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Release|x64.Build.0 = Release|x64
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Release|x64.Deploy.0 = Release|x64
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Release|x86.ActiveCfg = Release|Win32
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Release|x86.Build.0 = Release|Win32
+		{763C2569-2EB0-49E1-BC86-E3E0ADF06533}.Release|x86.Deploy.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
