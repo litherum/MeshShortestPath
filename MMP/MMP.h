@@ -12,8 +12,27 @@
 
 class MMP_DECL MMP final {
 public:
-	MMP(std::vector<std::array<double, 3>> pointHeap, std::vector<std::size_t> indices);
+	// FIXME: This is too restrictive.
+	MMP() = delete;
+	MMP(const MMP&) = delete;
+	MMP(MMP&&) = delete;
+	void operator=(const MMP&) = delete;
+	void operator=(MMP&&) = delete;
+
+	typedef std::vector<std::array<double, 3>> PointHeap;
+	typedef std::vector<std::array<PointHeap::size_type, 3>> TriangleIndices;
+	MMP(PointHeap pointHeap, TriangleIndices triangles, TriangleIndices::size_type startingPointOwningTriangle, double u, double v);
 	~MMP();
+
+	void run();
+
+	struct HalfedgeInterval {
+		std::array<double, 3> unfoldedRoot;
+		double endpointFraction;
+		double depth;
+	};
+	// Parallel to "triangles" argument passed to constructor.
+	std::vector<std::array<std::vector<HalfedgeInterval>, 3>> intervals() const;
 
 private:
 	class Impl;

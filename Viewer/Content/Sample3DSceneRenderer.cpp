@@ -31,7 +31,11 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	LoadState();
 	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
-	::MMP mmp({}, {});
+	::MMP mmp({}, {}, 0, 0, 0);
+	mmp.run();
+	for (const auto& intervals : mmp.intervals()) {
+	}
+
 	CreateDeviceDependentResources();
 	CreateWindowSizeDependentResources();
 }
