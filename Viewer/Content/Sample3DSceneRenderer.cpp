@@ -31,7 +31,34 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	LoadState();
 	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
-	::MMP mmp({}, {}, 0, 0, 0);
+	::MMP mmp({
+		{0, 0, 1},
+		{0, 1, 1},
+		{1, 1, 1},
+		{1, 0, 1},
+		{0, 0, 0},
+		{0, 1, 0},
+		{1, 1, 0},
+		{1, 0, 0}}, {
+		// Front
+		{0, 1, 2},
+		{2, 3, 0},
+		// Left
+		{4, 5, 1},
+		{1, 0, 4},
+		// Right
+		{3, 2, 6},
+		{6, 7, 3},
+		// Back
+		{7, 6, 5},
+		{5, 4, 7},
+		// Top
+		{1, 5, 6},
+		{6, 2, 1},
+		// Bottom
+		{4, 0, 3},
+		{3, 7, 4}},
+		0, 1.0 / 3.0, 1.0 / 3.0);
 	mmp.run();
 	for (const auto& intervals : mmp.intervals()) {
 	}
