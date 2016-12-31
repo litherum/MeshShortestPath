@@ -7,19 +7,51 @@
 #include <CGAL/Polyhedron_incremental_builder_3.h>
 #undef CGAL_CHECK_EXPENSIVE
 
+#include <boost/optional.hpp>
+
 #include <cassert>
+#include <algorithm>
+#include <list>
+#include <sstream>
 
 typedef CGAL::Simple_cartesian<double> Kernel;
+
+class CandidateInterval;
 
 template <class Refs>
 class MMPHalfedge : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 public:
+	uint8_t getIndex() const {
+		return index;
+	}
+
+	void setIndex(uint8_t index) {
+		this->index = index;
+	}
+
+	void iterateIntervals(std::function<void(const CandidateInterval&)> iterator) const {
+		for (auto interval : intervals) {
+			iterator(*interval);
+		}
+	}
+
+private:
 	uint8_t index; // 0 means "pointing from vertex 0 to vertex 1"
+	std::vector<std::list<CandidateInterval>::iterator> intervals;
 };
 
 template <class Refs, class Traits>
 class MMPFace : public CGAL::HalfedgeDS_face_base<Refs, CGAL::Tag_true, typename Traits::Plane_3> {
 public:
+	MMP::TriangleIndices::size_type getIndex() const {
+		return index;
+	}
+
+	void setIndex(MMP::TriangleIndices::size_type index) {
+		this->index = index;
+	}
+
+private:
 	MMP::TriangleIndices::size_type index;
 };
 
@@ -36,6 +68,29 @@ struct MMP_Items : public CGAL::Polyhedron_items_3 {
 };
 
 typedef CGAL::Polyhedron_3<Kernel, MMP_Items> Polyhedron;
+
+class CandidateInterval {
+public:
+	Polyhedron::Point getUnfoldedRoot() const {
+		return unfoldedRoot;
+	}
+
+	Kernel::FT getDepth() const {
+		return depth;
+	}
+
+	Kernel::FT getUpperExtentFraction() const{
+		return upperExtent;
+	}
+
+private:
+	Polyhedron::Point unfoldedRoot;
+	Polyhedron::Halfedge_handle halfedge;
+	Kernel::FT depth;
+	Kernel::FT lowerExtent; // 0 <= lowerExtent <= frontierPoint <= upperExtent <= 1
+	Kernel::FT upperExtent;
+	Kernel::FT frontierPoint;
+};
 
 class MMP::Impl {
 public:
@@ -93,14 +148,14 @@ private:
 			assert(halfedge->next()->next()->vertex() == vertices[std::get<2>(triangle)]);
 			assert(halfedge->next()->next()->next() == halfedge);
 
-			facet->index = i;
+			facet->setIndex(i);
 			auto p0 = halfedge->vertex()->point();
 			auto p1 = halfedge->next()->vertex()->point();
 			auto p2 = halfedge->next()->next()->vertex()->point();
 			facet->plane() = Polyhedron::Plane_3(p0, p1, p2);
-			halfedge->index = 2;
-			halfedge->next()->index = 0;
-			halfedge->next()->next()->index = 1;
+			halfedge->setIndex(2);
+			halfedge->next()->setIndex(0);
+			halfedge->next()->next()->setIndex(1);
 			if (i == startingPointOwningTriangle) {
 				startingFacet = facet;
 			}
@@ -125,8 +180,8 @@ MMP::Impl::Impl(PointHeap pointHeap, TriangleIndices triangles, TriangleIndices:
 	auto p0 = convertPoint(pointHeap[std::get<0>(startingTriangle)]);
 	auto p1 = convertPoint(pointHeap[std::get<1>(startingTriangle)]);
 	auto p2 = convertPoint(pointHeap[std::get<2>(startingTriangle)]);
-	Kernel::Vector_3 v0 = p1 - p0;
-	Kernel::Vector_3 v1 = p2 - p0;
+	auto v0 = p1 - p0;
+	auto v1 = p2 - p0;
 	startingPoint = p0 + u * v0 + v * v1;
 }
 
@@ -135,8 +190,26 @@ void MMP::Impl::run() {
 }
 
 auto MMP::Impl::intervals() const -> std::vector<std::array<std::vector<HalfedgeInterval>, 3>> {
-	// FIXME: Implement this.
-	return {};
+	std::vector<std::array<std::vector<HalfedgeInterval>, 3>> result(polyhedron.size_of_facets());
+	for (auto facet = polyhedron.facets_begin(); facet != polyhedron.facets_end(); ++facet) {
+		std::array<std::vector<HalfedgeInterval>, 3> edges;
+		auto halfedge = facet->halfedge();
+		do {
+			std::vector<HalfedgeInterval> intervals;
+			boost::optional<Kernel::FT> maximumExtent;
+			halfedge->iterateIntervals([&](const CandidateInterval& interval) {
+				auto unfoldedRoot = interval.getUnfoldedRoot();
+				auto upperExtent = interval.getUpperExtentFraction();
+				maximumExtent = maximumExtent ? std::max(maximumExtent.get(), upperExtent) : upperExtent;
+				intervals.push_back({{unfoldedRoot.x(), unfoldedRoot.y(), unfoldedRoot.z()}, upperExtent, interval.getDepth()});
+			});
+			assert(!maximumExtent || maximumExtent.get() == 1);
+			edges[halfedge->getIndex()] = std::move(intervals);
+			halfedge = halfedge->next();
+		} while (halfedge != facet->halfedge());
+		result[facet->getIndex()] = std::move(edges);
+	}
+	return result;
 }
 
 MMP::MMP(PointHeap pointHeap, TriangleIndices triangles, TriangleIndices::size_type startingPointOwningTriangle, double u, double v) : impl(std::make_unique<Impl>(pointHeap, triangles, startingPointOwningTriangle, u, v)) {
