@@ -705,10 +705,10 @@ private:
 		}
 
 		void operator()(const FrontierPointEvent& event) const {
-			/*if (event.getCandidateInterval()->isDeleted()) {
-				mmp.candidateIntervals.erase(event.getCandidateInterval());
+			if (event.getCandidateInterval()->isDeleted()) {
+				impl.candidateIntervals.erase(event.getCandidateInterval());
 				return;
-			}*/
+			}
 
 			// FIXME: Possibly label the event
 			impl.propagate(*event.getCandidateInterval());
