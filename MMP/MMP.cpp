@@ -1,11 +1,9 @@
 ﻿#include "pch.h"
 #include "MMP.h"
 
-#define CGAL_CHECK_EXPENSIVE
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/Polyhedron_3.h>
 #include <CGAL/Polyhedron_incremental_builder_3.h>
-#undef CGAL_CHECK_EXPENSIVE
 
 #include <boost/optional.hpp>
 #include <boost/variant.hpp>
@@ -13,7 +11,7 @@
 #include <cassert>
 #include <algorithm>
 #include <list>
-#include <sstream>
+#include <cmath>
 
 typedef CGAL::Simple_cartesian<double> Kernel;
 
@@ -22,12 +20,156 @@ class CandidateInterval;
 template <class Refs>
 class MMPHalfedge : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 public:
-	uint8_t getIndex() const {
-		return index;
-	}
+	void insertInterval(CandidateInterval& interval, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
+		CandidateInterval::AccessPoint searchFor = {1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next()};
 
-	void setIndex(uint8_t index) {
-		this->index = index;
+		auto searchComparison = [](const CandidateInterval::AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
+			if (existing->accessPoint.initialSide && !probe.initialSide)
+				return false;
+			if (!existing->accessPoint.initialSide && probe.initialSide)
+				return true;
+			return existing->accessPoint.location > probe.location;
+		};
+
+		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
+
+		auto findEndOfDominatedIntervals = [&](auto begin, auto end, Polyhedron::Point(CandidateInterval::*extentFunction)() const) {
+			while (begin != end) {
+				if ((*begin)->lowerExtent >= interval.lowerExtent && (*begin)->upperExtent <= interval.upperExtent &&
+					distanceBetweenPoints(((**begin).*extentFunction)(), (*begin)->getUnfoldedRoot()) + (*begin)->getDepth() >=
+					distanceBetweenPoints(((**begin).*extentFunction)(), interval.getUnfoldedRoot()) + interval.getDepth())
+					++begin;
+				else
+					break;
+			}
+			return begin;
+		};
+
+		auto beginDeleting = findEndOfDominatedIntervals(std::make_reverse_iterator(location), intervals.rend(), &CandidateInterval::getLowerExtent);
+		auto endDeleting = findEndOfDominatedIntervals(location, intervals.end(), &CandidateInterval::getUpperExtent);
+		// These are pointing to the furthest item which should NOT be deleted.
+		// Calling base() on beginDeleting will make it point to the first item which SHOULD be deleted. (Or equal to endDeleting.)
+
+		// "Left and "right" are in reference to a halfedge which points to the right. (--------->)
+		boost::optional<Kernel::FT> leftTrimPoint;
+		boost::optional<Kernel::FT> rightTrimPoint;
+
+		auto calculateTrimPoints = [](const CandidateInterval& a, const CandidateInterval& b) -> boost::optional<Kernel::FT> {
+			auto tiePoints = calculateTiePoints(a, b);
+			auto endIterator = std::copy_if(tiePoints.begin(), tiePoints.end(), tiePoints.begin(), [&](Kernel::FT scalar) {
+				return scalar >= a.lowerExtent && scalar >= a.upperExtent &&
+					scalar >= b.lowerExtent && scalar <= b.upperExtent;
+			});
+			tiePoints.erase(endIterator, tiePoints.end());
+			if (tiePoints.empty())
+				return boost::none;
+			else {
+				assert(tiePoints.size() == 1);
+				return tiePoints[0];
+			}
+		};
+
+		if (beginDeleting != intervals.rend()) {
+			if (auto trimPoint = calculateTrimPoints(**beginDeleting, interval))
+				leftTrimPoint = trimPoint;
+			else
+				return;
+		}
+
+		if (endDeleting != intervals.end()) {
+			if (auto trimPoint = calculateTrimPoints(interval, **endDeleting))
+				rightTrimPoint = trimPoint;
+			else
+				return;
+		}
+
+		if (leftTrimPoint && rightTrimPoint && *leftTrimPoint > *rightTrimPoint)
+			return;
+
+		// Ready to go! Let's start modifying things.
+
+		// The event queue has iterators into the candidateIntervals list, so we can't simply delete them without updating the event queue.
+		std::for_each(beginDeleting.base(), endDeleting, [](auto candidateInterval) {
+			candidateInterval->setDeleted();
+		});
+		bool result = beginDeleting == intervals.rend() || endDeleting == intervals.end();
+
+		auto insertLocation = intervals.erase(beginDeleting.base(), endDeleting);
+
+		auto trimRightSide = [](const CandidateInterval& interval, Kernel::FT location) {
+			return CandidateInterval(interval.getHalfedge(), interval.getUnfoldedRoot(), interval.getDepth(), interval.lowerExtent, location);
+		};
+
+		auto trimLeftSide = [](const CandidateInterval& interval, Kernel::FT location) {
+			return CandidateInterval(interval.getHalfedge(), interval.getUnfoldedRoot(), interval.getDepth(), location, interval.upperExtent);
+		};
+
+		auto trimLeftNeighbor = [&](std::vector<std::list<CandidateInterval>::iterator>::iterator location) {
+			if (!leftTrimPoint)
+				return location;
+
+			auto leftNeighbor = location;
+			--leftNeighbor;
+
+			if ((*leftNeighbor)->frontierPoint > *leftTrimPoint) {
+				(*leftNeighbor)->setDeleted();
+				auto newLeftSide = trimRightSide(**leftNeighbor, *leftTrimPoint);
+				auto addedLeftSide = addCandidateInterval(newLeftSide);
+				auto insertLocation = intervals.erase(leftNeighbor);
+				auto result = intervals.insert(insertLocation, addedLeftSide);
+				++result;
+				return result;
+			}
+			else {
+				(*leftNeighbor)->upperExtent = *leftTrimPoint;
+				return location;
+			}
+		};
+
+		insertLocation = trimLeftNeighbor(insertLocation);
+
+		auto trimRightNeighbor = [&](std::vector<std::list<CandidateInterval>::iterator>::iterator location) {
+			if (!rightTrimPoint)
+				return location;
+
+			auto rightNeighbor = location;
+
+			if ((*rightNeighbor)->frontierPoint < *rightTrimPoint) {
+				(*rightNeighbor)->setDeleted();
+				auto newRightSide = trimLeftSide(**rightNeighbor, *rightTrimPoint);
+				auto addedRightSide = addCandidateInterval(newRightSide);
+				auto insertLocation = intervals.erase(rightNeighbor);
+				auto result = intervals.insert(insertLocation, addedRightSide);
+				return result;
+			}
+			else {
+				(*rightNeighbor)->lowerExtent = *rightTrimPoint;
+				return location;
+			}
+		};
+
+		insertLocation = trimRightNeighbor(insertLocation);
+
+		if ((rightTrimPoint && interval.frontierPoint > *rightTrimPoint) ||
+			(leftTrimPoint && interval.frontierPoint < *leftTrimPoint)) {
+			CandidateInterval newInterval = interval;
+			if (rightTrimPoint && leftTrimPoint)
+				newInterval = trimLeftSide(trimRightSide(newInterval, *rightTrimPoint), *leftTrimPoint);
+			else if (rightTrimPoint)
+				newInterval = trimRightSide(newInterval, *rightTrimPoint);
+			else if (leftTrimPoint)
+				newInterval = trimLeftSide(newInterval, *leftTrimPoint);
+			auto addedInterval = addCandidateInterval(newInterval);
+			intervals.insert(insertLocation, addedInterval);
+		}
+		else {
+			if (leftTrimPoint)
+				interval.lowerExtent = *leftTrimPoint;
+			if (rightTrimPoint)
+				interval.upperExtent = *rightTrimPoint;
+			auto addedInterval = addCandidateInterval(interval);
+			intervals.insert(insertLocation, addedInterval);
+		}
 	}
 
 	void insertInitialInterval(std::list<CandidateInterval>::iterator interval) {
@@ -41,9 +183,17 @@ public:
 		}
 	}
 
+	uint8_t getIndex() const {
+		return index;
+	}
+
+	void setIndex(uint8_t index) {
+		this->index = index;
+	}
+
 private:
-	uint8_t index; // 0 means "pointing from vertex 0 to vertex 1"
 	std::vector<std::list<CandidateInterval>::iterator> intervals;
+	uint8_t index; // 0 means "pointing from vertex 0 to vertex 1"
 };
 
 template <class Refs, class Traits>
@@ -75,13 +225,117 @@ struct MMP_Items : public CGAL::Polyhedron_items_3 {
 
 typedef CGAL::Polyhedron_3<Kernel, MMP_Items> Polyhedron;
 
+static Kernel::FT distanceBetweenPoints(Polyhedron::Point a, Polyhedron::Point b) {
+	return std::sqrt((b - a).squared_length());
+}
+
+static Kernel::FT projectionScalar(Polyhedron::Halfedge_handle halfedge, Polyhedron::Point point) {
+	auto source = halfedge->opposite()->vertex()->point();
+	auto destination = halfedge->vertex()->point();
+	auto b = destination - source;
+	auto a = point - source;
+	return (a * b) / (b * b);
+}
+
+static std::vector<Kernel::FT> quadraticFormula(Kernel::FT a, Kernel::FT b, Kernel::FT c) {
+	auto discriminant = b * b - 4 * a * c;
+	if (discriminant < 0)
+		return {};
+	else if (discriminant == 0) // FIXME: Possibly round a little
+		return { -b / (2 * a) };
+	else {
+		auto discriminantSquareRoot = std::sqrt(discriminant);
+		return {(-b + discriminantSquareRoot) / (2 * a), (-b - discriminantSquareRoot) / (2 * a)};
+	}
+}
+
+static bool checkLineLineIntersectionResult(Kernel::FT result, Polyhedron::Point p1, Kernel::Vector_3 v1, Polyhedron::Point p2, Kernel::Vector_3 v2) {
+	auto resultPoint = p1 + result * v1;
+	Kernel::Line_3 l2(p2, v2);
+	auto projected = l2.projection(resultPoint);
+	auto displacement = projected - resultPoint;
+	return displacement.squared_length() <= 0.001;
+}
+
+static boost::optional<Kernel::FT> lineLineIntersection(Polyhedron::Point a1, Polyhedron::Point a2, Polyhedron::Point b1, Polyhedron::Point b2) {
+	// Calculates the fraction of the distance between a1 and a2 the intersection occurs.
+	auto av = a2 - a1;
+	auto bv = b2 - b1;
+
+	// a + t*b = c + s*d, f + t*g = h + s*j
+	// t = (-a * j + c * j + d * f - d * h) / (b * j - d * g)
+
+	auto calculateDenominator = [](Kernel::FT v1p, Kernel::FT v1q, Kernel::FT v2p, Kernel::FT v2q) {
+		// b, g, d, j
+		// return b * j - d * g
+		return v1p * v2q - v2p * v1q;
+	};
+
+	auto calculateNumerator = [](Kernel::FT p1p, Kernel::FT p1q, Kernel::FT p2p, Kernel::FT p2q, Kernel::FT v2p, Kernel::FT v2q) {
+		// a, f, c, h, d, j
+		// return -a * j + c * j + d * f - d * h
+		return -p1p * v2q + p2p * v2q + v2p * p1q - v2p * p2q;
+	};
+
+	auto denominatorXY = calculateDenominator(av.x(), av.y(), bv.x(), bv.y());
+	auto denominatorXZ = calculateDenominator(av.x(), av.z(), bv.x(), bv.z());
+	auto denominatorYZ = calculateDenominator(av.y(), av.z(), bv.y(), bv.z());
+
+	auto denominatorXYAbs = std::abs(denominatorXY);
+	auto denominatorXZAbs = std::abs(denominatorXZ);
+	auto denominatorYZAbs = std::abs(denominatorYZ);
+
+	if (denominatorXYAbs < 0.0000001 && denominatorXZAbs < 0.0000001 && denominatorYZAbs < 0.0000001)
+		return boost::none;
+
+	Kernel::FT t;
+
+	if (denominatorXYAbs >= denominatorXZAbs && denominatorXYAbs >= denominatorYZAbs) {
+		// Use XY
+		auto numerator = calculateNumerator(a1.x(), a1.y(), b1.x(), b1.y(), bv.x(), bv.y());
+		t = numerator / denominatorXY;
+	}
+	else if (denominatorXZAbs >= denominatorXYAbs && denominatorXZAbs >= denominatorYZAbs) {
+		// Use XZ
+		auto numerator = calculateNumerator(a1.x(), a1.z(), b1.x(), b1.z(), bv.x(), bv.z());
+		t = numerator / denominatorXZ;
+	}
+	else {
+		// Use YZ
+		auto numerator = calculateNumerator(a1.y(), a1.z(), b1.y(), b1.z(), bv.y(), bv.z());
+		t = numerator / denominatorYZ;
+	}
+	assert(checkLineLineIntersectionResult(t, a1, av, b1, bv));
+	return t;
+}
+
 class CandidateInterval {
 public:
-	CandidateInterval(Polyhedron::Halfedge_handle halfedge, Kernel::Point_3 unfoldedRoot, Kernel::FT depth, Kernel::FT lowerExtent, Kernel::FT upperExtent) : halfedge(halfedge), unfoldedRoot(unfoldedRoot), depth(depth), lowerExtent(lowerExtent), upperExtent(upperExtent) {
+	CandidateInterval(Polyhedron::Halfedge_handle halfedge, Polyhedron::Point unfoldedRoot, Kernel::FT depth, Kernel::FT lowerExtent, Kernel::FT upperExtent) : halfedge(halfedge), unfoldedRoot(unfoldedRoot), depth(depth), lowerExtent(lowerExtent), upperExtent(upperExtent) {
+		assert(lowerExtent <= upperExtent);
+		assert(lowerExtent >= 0);
+		assert(upperExtent <= 1);
+		frontierPoint = projectionScalar(halfedge, unfoldedRoot);
+
+		// FIXME: Provide some more resilient way to test for frontier points coincident with vertices
+		if (frontierPoint <= lowerExtent) {
+			frontierPoint = lowerExtent;
+			frontierPointIsAtExtent = true;
+		}
+		else if (frontierPoint >= upperExtent) {
+			frontierPoint = upperExtent;
+			frontierPointIsAtExtent = true;
+		}
+
+		accessPoint = calculateAccessPoint();
 	}
 
 	Polyhedron::Point getUnfoldedRoot() const {
 		return unfoldedRoot;
+	}
+
+	Polyhedron::Halfedge_handle getHalfedge() const {
+		return halfedge;
 	}
 
 	Kernel::FT getDepth() const {
@@ -92,20 +346,82 @@ public:
 		return upperExtent;
 	}
 
-	Kernel::Point_3 getFrontierPoint() const {
+	Polyhedron::Point getFrontierPoint() const {
 		return calculatePoint(frontierPoint);
 	}
 
-	Kernel::Point_3 getLowerExtent() const {
+	Polyhedron::Point getLowerExtent() const {
 		return calculatePoint(lowerExtent);
 	}
 
-	Kernel::Point_3 getUpperExtent() const {
+	Polyhedron::Point getUpperExtent() const {
 		return calculatePoint(upperExtent);
 	}
 
+	bool getFrontierPointIsAtExtent() const {
+		return frontierPointIsAtExtent;
+	}
+
+	void setFrontierPointIsAtVertex(bool isAtVertex) {
+		frontierPointIsAtVertex = isAtVertex;
+	}
+
+	bool getFrontierPointIsAtVertex() const {
+		return frontierPointIsAtVertex;
+	}
+
+	bool isDeleted() const {
+		return deleted;
+	}
+
+	void setDeleted() {
+		deleted = true;
+	}
+
 private:
-	Kernel::Point_3 calculatePoint(Kernel::FT fraction) const {
+	template <class Refs>
+	friend class MMPHalfedge;
+
+	struct AccessPoint {
+		Kernel::FT location;
+		bool initialSide;
+	};
+
+	static Kernel::FT projectionScalar(Polyhedron::Halfedge_handle halfedge, Polyhedron::Point point) {
+		auto source = halfedge->opposite()->vertex()->point();
+		auto destination = halfedge->vertex()->point();
+		auto b = destination - source;
+		auto a = point - source;
+		return (a * b) / (b * b);
+	}
+
+	AccessPoint calculateAccessPoint() const {
+		auto initialSideFraction = lineLineIntersection(halfedge->vertex()->point(), halfedge->next()->vertex()->point(), unfoldedRoot, getFrontierPoint());
+		if (!initialSideFraction || *initialSideFraction > 1 || *initialSideFraction < 0) {
+			auto secondarySideFraction = lineLineIntersection(halfedge->next()->vertex()->point(), halfedge->next()->next()->vertex()->point(), unfoldedRoot, getFrontierPoint());
+			if (!initialSideFraction && secondarySideFraction)
+				return {std::min(std::max(*secondarySideFraction, Kernel::FT(0)), Kernel::FT(1)), false};
+			else if (initialSideFraction && !secondarySideFraction)
+				return {std::min(std::max(*initialSideFraction, Kernel::FT(0)), Kernel::FT(1)), true};
+			else {
+				assert(initialSideFraction && secondarySideFraction);
+				if (*secondarySideFraction > 1 || *secondarySideFraction < 0) {
+					auto initialSideDistance = std::min(std::abs(*initialSideFraction), std::abs(*initialSideFraction - 1));
+					auto secondarySideDistance = std::min(std::abs(*secondarySideFraction), std::abs(*secondarySideFraction - 1));
+					if (initialSideDistance < secondarySideDistance)
+						return {std::min(std::max(*initialSideFraction, Kernel::FT(0)), Kernel::FT(1)), true};
+					else
+						return {std::min(std::max(*secondarySideFraction, Kernel::FT(0)), Kernel::FT(1)), false};
+				}
+				else
+					return {*secondarySideFraction, false};
+			}
+		}
+		else
+			return {*initialSideFraction, true};
+	}
+
+	Polyhedron::Point calculatePoint(Kernel::FT fraction) const {
 		auto destination = halfedge->vertex()->point();
 		auto source = halfedge->opposite()->vertex()->point();
 		auto s = destination - source;
@@ -114,11 +430,77 @@ private:
 
 	Polyhedron::Point unfoldedRoot;
 	Polyhedron::Halfedge_handle halfedge;
+	AccessPoint accessPoint;
 	Kernel::FT depth;
 	Kernel::FT lowerExtent; // 0 <= lowerExtent <= frontierPoint <= upperExtent <= 1
 	Kernel::FT upperExtent;
 	Kernel::FT frontierPoint;
+	bool frontierPointIsAtExtent {false};
+	bool frontierPointIsAtVertex {false};
+	bool deleted {false};
 };
+
+static std::vector<Kernel::FT> calculateTiePoints(Kernel::FT d1, Kernel::FT r1, Kernel::FT b, Kernel::FT d2, Kernel::FT r2) {
+	// b = d1 + d2
+	// d1 + sqrt(r1^2 + b1^2) = d2 + sqrt(r2^2 + b2^2)
+	auto d = d1 - d2;
+	auto ra = r1 * r1;
+	auto rb = r2 * r2;
+	// d + sqrt(ra + b1^2) = sqrt(rb + (b - b1)^2)
+
+	if (d == 0) {
+		// sqrt(ra + b1^2) = sqrt(rb + (b - b1)^2)
+		// ra + b1^2 = rb + (b - b1)^2
+		// ra + b1^2 = rb + b^2 - 2*b*b1 * b1^2
+		// ra = rb + b^2 - 2*b*b1
+		// b1 * 2b = rb + b^2 - ra
+		assert(b != 0);
+		return {(rb + b * b - ra) / (2 * b)};
+	}
+
+	// d^2 + 2d * sqrt(ra + b1^2) + ra + b1^2 = rb + (b - b1)^2 // good
+	// sqrt(ra + b1^2) = (rb + (b - b1)^2 - d^2 - ra - b1^2) / 2d
+	// ra + b1^2 = (rb + (b - b1)^2 - d^2 - ra - b1^2)^2 / (4d^2)
+	// 4d^2 * (ra + b1^2) = (rb + (b - b1)^2 - d^2 - ra - b1^2) ^ 2
+	// 4d^2 * (ra + b1^2) = (rb + b^2 - 2*b*b1 + b1^2 - d^2 - ra - b1^2) ^ 2
+	// 4d^2 * (ra + b1^2) = (rb + b^2 - 2*b*b1 - d^2 - ra) ^ 2
+	auto m = rb + b*b - d*d - ra;
+	// 4d^2 * (ra + b1^2) = (m - 2*b*b1) ^ 2
+	// 4d^2 * (ra + b1^2) = m^2 - 4*m*b*b1 + 4*b^2*b1^2
+	// 0 = b1^2 * (4b^2 - 4d^2) + b1 * (-4mb) + (m^2 - 4d^2 * ra)
+	auto result = quadraticFormula(4 * b * b - 4 * d * d, -4 * m * b, m * m - 4 * d * d * ra);
+	auto endIterator = std::copy_if(result.begin(), result.end(), result.begin(), [&](Kernel::FT b1) {
+		return (rb + (b - b1) * (b - b1) - d * d - ra - b1 * b1) / (2 * d) >= 0 &&
+			d + sqrt(ra + b1 *b1) >= 0;
+	});
+	result.erase(endIterator, result.end());
+	return result;
+}
+
+static std::vector<Kernel::FT> calculateTiePoints(const CandidateInterval& a, const CandidateInterval& b) {
+	assert(a.getHalfedge() == b.getHalfedge());
+	auto halfedge = a.getHalfedge();
+	auto source = halfedge->opposite()->vertex()->point();
+	auto destination = halfedge->vertex()->point();
+	auto vector = destination - source;
+
+	auto d1 = a.getDepth();
+	auto projectionScalarA = projectionScalar(halfedge, a.getUnfoldedRoot());
+	auto closestApproachA = source + projectionScalarA * vector;
+	auto r1 = distanceBetweenPoints(a.getUnfoldedRoot(), closestApproachA);
+	auto projectionScalarB = projectionScalar(halfedge, b.getUnfoldedRoot());
+	auto closestApproachB = source + projectionScalarB * vector;
+	auto distance = distanceBetweenPoints(closestApproachA, closestApproachB);
+	auto d2 = b.getDepth();
+	auto r2 = distanceBetweenPoints(b.getUnfoldedRoot(), closestApproachB);
+
+	auto result = calculateTiePoints(d1, r1, distance, d2, r2);
+	// The result is distances, but we need scalar multipliers
+	std::transform(result.begin(), result.end(), result.begin(), [&](Kernel::FT tiePointDistance) {
+		return projectionScalarA + distance / std::sqrt(vector.squared_length());
+	});
+	return result;
+}
 
 class MMP::Impl {
 public:
@@ -253,13 +635,13 @@ private:
 		}
 
 	private:
-		Kernel::Point_3 point;
+		Polyhedron::Point point;
 		std::list<CandidateInterval>::iterator candidateInterval;
 	};
 
 	class EndPointEvent {
 	public:
-		EndPointEvent(Kernel::Point_3 point, const CandidateInterval& candidateInterval) : point(point), label(computeLabel(point, candidateInterval)) {
+		EndPointEvent(Polyhedron::Point point, const CandidateInterval& candidateInterval) : point(point), label(computeLabel(point, candidateInterval)) {
 		}
 
 		Kernel::FT getLabel() const {
@@ -267,7 +649,7 @@ private:
 		}
 
 	private:
-		Kernel::Point_3 point;
+		Polyhedron::Point point;
 		Kernel::FT label;
 	};
 
@@ -344,14 +726,143 @@ private:
 		return Polyhedron::Point(std::get<0>(point), std::get<1>(point), std::get<2>(point));
 	};
 
-	static Kernel::FT computeLabel(Kernel::Point_3 point, const CandidateInterval& candidateInterval) {
+	static Kernel::FT computeLabel(Polyhedron::Point point, const CandidateInterval& candidateInterval) {
 		auto unfoldedRoot = candidateInterval.getUnfoldedRoot();
 		auto displacement = point - unfoldedRoot;
 		return std::sqrt(displacement.squared_length()) + candidateInterval.getDepth();
 	}
 
 	void propagate(const CandidateInterval& interval) {
-		// FIXME: Implement this.
+		if (interval.getFrontierPointIsAtVertex()) {
+			// FIXME: Find the vertex, then find opposite edges which are greater than 2*pi, then insertInteval()
+		}
+		else {
+			auto projected = project(interval);
+
+			for (auto& candidateInterval : projected) {
+				if (candidateInterval) {
+					candidateInterval->getHalfedge()->insertInterval(*candidateInterval, interval, [&](CandidateInterval candidateInterval) {
+						auto result = candidateIntervals.insert(candidateIntervals.end(), candidateInterval);
+						eventQueue.place(FrontierPointEvent(result));
+						return result;
+					});
+				}
+			}
+		}
+	}
+
+	Polyhedron::Point calculateUnfoldedRoot(Polyhedron::Point oldUnfoldedRoot, Polyhedron::Plane_3 originalPlane, Polyhedron::Plane_3 newPlane, Kernel::Line_3 intersection) {
+		auto originalNormal = originalPlane.orthogonal_vector();
+		originalNormal = originalNormal / std::sqrt(originalNormal.squared_length());
+
+		auto newNormal = newPlane.orthogonal_vector();
+		newNormal = newNormal / std::sqrt(newNormal.squared_length());
+
+		auto crossProduct = CGAL::cross_product(originalNormal, newNormal);
+		auto dotProduct = originalNormal * newNormal;
+		if (std::abs(crossProduct.squared_length()) < 0.001) { // Coplanar
+			if (dotProduct > 0)
+				return oldUnfoldedRoot;
+			else {
+				auto projection = intersection.projection(oldUnfoldedRoot);
+				auto delta = oldUnfoldedRoot - projection;
+				return projection - delta;
+			}
+		}
+		else {
+			auto magnitude = std::sqrt(crossProduct.squared_length());
+			auto axis = crossProduct / magnitude;
+			auto angle = std::asin(magnitude);
+			if (dotProduct < 0)
+				angle = M_PI - angle;
+
+			auto projection = intersection.projection(oldUnfoldedRoot);
+			auto translatedUnfoldedRoot = oldUnfoldedRoot - projection;
+
+			// Rodrigues' rotation formula
+			auto cosTheta = std::cos(angle);
+			auto rotated = translatedUnfoldedRoot * cosTheta + CGAL::cross_product(axis, translatedUnfoldedRoot) + axis * (axis * translatedUnfoldedRoot) * (1 - cosTheta);
+			auto rotatedTranslatedBack = Kernel::Vector_3(projection.x(), projection.y(), projection.z()) + rotated;
+			return Polyhedron::Point(rotatedTranslatedBack.x(), rotatedTranslatedBack.y(), rotatedTranslatedBack.z());
+		}
+	}
+
+	static boost::optional<Kernel::FT> lineLineIntersectionWithDirection(Polyhedron::Point a1, Polyhedron::Point a2, Polyhedron::Point b1, Polyhedron::Point b2) {
+		auto intersection = lineLineIntersection(a1, a2, b1, b2);
+		if (!intersection)
+			return boost::none;
+		Kernel::FT t = *intersection;
+
+		// Calculate s to see if it is negative.
+		// a + t*b = c + s*d
+		// s = (a + t*b - c) / d
+
+		auto calculateS = [&](Kernel::FT p1, Kernel::FT v1, Kernel::FT p2, Kernel::FT v2) {
+			// a, b, c, d
+			return (p1 + t * v1 - p2) / v2;
+		};
+
+		auto av = a2 - a1;
+		auto bv = b2 - b1;
+		auto bvxAbs = std::abs(bv.x());
+		auto bvyAbs = std::abs(bv.y());
+		auto bvzAbs = std::abs(bv.z());
+
+		Kernel::FT s;
+
+		if (bvxAbs >= bvyAbs && bvxAbs >= bvzAbs)
+			s = calculateS(a1.x(), av.x(), b1.x(), bv.x());
+		else if (bvyAbs >= bvxAbs && bvyAbs >= bvzAbs)
+			s = calculateS(a1.y(), av.y(), b1.y(), bv.y());
+		else
+			s = calculateS(a1.z(), av.z(), b1.z(), bv.z());
+
+		if (s < 0) {
+			if (av * bv > 0)
+				return std::numeric_limits<Kernel::FT>::infinity();
+			else
+				return -std::numeric_limits<Kernel::FT>::infinity();
+		}
+		else
+			return t;
+	}
+
+	std::array<boost::optional<CandidateInterval>, 2> project(const CandidateInterval& interval) {
+		auto halfedge = interval.getHalfedge();
+		auto opposite = halfedge->opposite();
+		auto next = opposite->next();
+		auto nextnext = next->next();
+		assert(nextnext->next() == opposite);
+
+		auto newUnfoldedRoot = calculateUnfoldedRoot(interval.getUnfoldedRoot(), halfedge->facet()->plane(), opposite->facet()->plane(), Kernel::Line_3(halfedge->vertex()->point(), opposite->vertex()->point()));
+
+		auto project = [&](Polyhedron::Halfedge_handle halfedge) -> boost::optional<CandidateInterval> {
+			auto source = halfedge->opposite()->vertex()->point();
+			auto destination = halfedge->vertex()->point();
+			auto lowerScalar = lineLineIntersectionWithDirection(source, destination, newUnfoldedRoot, interval.getLowerExtent());
+			auto upperScalar = lineLineIntersectionWithDirection(source, destination, newUnfoldedRoot, interval.getUpperExtent());
+			if (!lowerScalar) {
+				assert(upperScalar);
+				if ((destination - source) * (interval.getLowerExtent() - newUnfoldedRoot) > 0)
+					lowerScalar = std::numeric_limits<Kernel::FT>::infinity();
+				else
+					lowerScalar = -std::numeric_limits<Kernel::FT>::infinity();
+			}
+			if (!upperScalar) {
+				assert(lowerScalar);
+				if ((destination - source) * (interval.getUpperExtent() - newUnfoldedRoot) > 0)
+					upperScalar = std::numeric_limits<Kernel::FT>::infinity();
+				else
+					upperScalar = -std::numeric_limits<Kernel::FT>::infinity();
+			}
+			*lowerScalar = std::min(std::max(*lowerScalar, Kernel::FT(0)), Kernel::FT(1));
+			*upperScalar = std::min(std::max(*upperScalar, Kernel::FT(0)), Kernel::FT(1));
+			if (upperScalar > lowerScalar)
+				return CandidateInterval(halfedge, newUnfoldedRoot, interval.getDepth(), *lowerScalar, *upperScalar);
+			else
+				return boost::none;
+		};
+		return{ project(next), project(nextnext) };
 	}
 
 	Polyhedron polyhedron;
