@@ -342,6 +342,10 @@ public:
 		return depth;
 	}
 
+	Kernel::FT getLowerExtentFraction() const {
+		return lowerExtent;
+	}
+
 	Kernel::FT getUpperExtentFraction() const {
 		return upperExtent;
 	}
@@ -554,9 +558,10 @@ public:
 				boost::optional<Kernel::FT> maximumExtent;
 				halfedge->iterateIntervals([&](const CandidateInterval& interval) {
 					auto unfoldedRoot = interval.getUnfoldedRoot();
+					auto lowerExtent = interval.getLowerExtentFraction();
 					auto upperExtent = interval.getUpperExtentFraction();
 					maximumExtent = maximumExtent ? std::max(maximumExtent.get(), upperExtent) : upperExtent;
-					intervals.push_back({ { unfoldedRoot.x(), unfoldedRoot.y(), unfoldedRoot.z() }, upperExtent, interval.getDepth() });
+					intervals.push_back({ { unfoldedRoot.x(), unfoldedRoot.y(), unfoldedRoot.z() }, lowerExtent, upperExtent, interval.getDepth() });
 				});
 				// FIXME: Uncomment this.
 				//assert(maximumExtent.is_initialized() && maximumExtent.get() == 1);

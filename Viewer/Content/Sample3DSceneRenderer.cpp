@@ -5,6 +5,8 @@
 #include <ppltasks.h>
 #include <synchapi.h>
 
+#include <sstream>
+
 #include "MMP.h"
 
 using namespace Viewer;
@@ -30,41 +32,6 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 {
 	LoadState();
 	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
-
-	MMP::PointHeap pointHeap = {
-		{0, 0, 1},
-		{0, 1, 1},
-		{1, 1, 1},
-		{1, 0, 1},
-		{0, 0, 0},
-		{0, 1, 0},
-		{1, 1, 0},
-		{1, 0, 0}};
-	MMP::TriangleIndices triangles = {
-		// Front
-		{0, 1, 2},
-		{2, 3, 0},
-		// Left
-		{4, 5, 1},
-		{1, 0, 4},
-		// Right
-		{3, 2, 6},
-		{6, 7, 3},
-		// Back
-		{7, 6, 5},
-		{5, 4, 7},
-		// Top
-		{1, 5, 6},
-		{6, 2, 1},
-		// Bottom
-		{4, 0, 3},
-		{3, 7, 4}};
-
-	MMP mmp(pointHeap, triangles, 0, 1.0 / 3.0, 1.0 / 3.0);
-	mmp.run();
-	auto intervals = mmp.intervals();
-	for (const auto& intervals : intervals) {
-	}
 
 	CreateDeviceDependentResources();
 	CreateWindowSizeDependentResources();
@@ -124,7 +91,8 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		static const D3D12_INPUT_ELEMENT_DESC inputLayout[] =
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12 + 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
@@ -159,14 +127,89 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetCommandAllocator(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
         NAME_D3D12_OBJECT(m_commandList);
 
-		// Cube vertices. Each vertex has a position and a color.
-		VertexPositionColor cubeVertices[] = {
-			{ XMFLOAT3(-0.5f, -0.5f,  0.5f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-			{ XMFLOAT3(-0.5f,  0.5f,  0.5f), XMFLOAT3(0.0f, 1.0f, 1.0f) },
-			{ XMFLOAT3(0.5f,  0.5f,  0.5f), XMFLOAT3(1.0f, 1.0f, 1.0f) },
-		};
+		MMP::PointHeap pointHeap = {
+			{0, 0, 1},
+			{0, 1, 1},
+			{1, 1, 1},
+			{1, 0, 1},
+			{0, 0, 0},
+			{0, 1, 0},
+			{1, 1, 0},
+			{1, 0, 0}};
+		MMP::TriangleIndices triangles = {
+			// Front
+			{0, 1, 2},
+			{2, 3, 0},
+			// Left
+			{4, 5, 1},
+			{1, 0, 4},
+			// Right
+			{3, 2, 6},
+			{6, 7, 3},
+			// Back
+			{7, 6, 5},
+			{5, 4, 7},
+			// Top
+			{1, 5, 6},
+			{6, 2, 1},
+			// Bottom
+			{4, 0, 3},
+			{3, 7, 4}};
 
-		const UINT vertexBufferSize = sizeof(cubeVertices);
+		MMP mmp(pointHeap, triangles, 0, 1.0 / 3.0, 1.0 / 3.0);
+		mmp.run();
+		auto intervals = mmp.intervals();
+		assert(triangles.size() == intervals.size());
+		std::size_t maximum = 0;
+		std::ostringstream outputStream;
+		for (std::size_t triangleIndex = 0; triangleIndex < intervals.size(); ++triangleIndex) {
+			auto triangle = triangles[triangleIndex];
+			auto interval = intervals[triangleIndex];
+			outputStream << "Triangle " << triangleIndex << std::endl;
+			for (uint8_t edgeIndex = 0; edgeIndex < 3; ++edgeIndex) {
+				auto edge = interval[edgeIndex];
+				auto p0 = pointHeap[triangle[edgeIndex]];
+				auto p1 = pointHeap[triangle[(edgeIndex + 1) % 3]];
+				outputStream << "    Edge from (" << std::get<0>(p0) << ", " << std::get<1>(p0) << ", " << std::get<2>(p0) << ") to (" << std::get<0>(p1) << ", " << std::get<1>(p1) << ", " << std::get<2>(p1) << ")" << std::endl;
+				for (auto& interval : edge) {
+					outputStream << "        " << interval.beginpointFraction << " " << interval.endpointFraction << std::endl;
+				}
+				maximum = std::max(maximum, edge.size());
+			}
+		}
+		outputStream << "Maximum number of intervals per edge: " << maximum << std::endl;
+		OutputDebugStringA(outputStream.str().c_str());
+		assert(maximum <= 1);
+
+		std::vector<VertexPositionData> cubeVertices;
+		for (std::size_t triangleIndex = 0; triangleIndex < triangles.size(); ++triangleIndex) {
+			auto appendVertex = [&](uint8_t vertexIndex) {
+				auto point = pointHeap[triangles[triangleIndex][vertexIndex]];
+				auto edgeIntervals = intervals[triangleIndex][vertexIndex];
+				XMFLOAT3 pos(static_cast<float>(std::get<0>(point)), static_cast<float>(std::get<1>(point)), static_cast<float>(std::get<2>(point)));
+				XMFLOAT4 data0;
+				XMFLOAT3 data1;
+				if (edgeIntervals.empty()) {
+					data0 = XMFLOAT4(0, 0, 0, 0);
+					data1 = XMFLOAT3(0, 0, 0);
+				}
+				else {
+					assert(edgeIntervals.size() == 1);
+					auto interval = edgeIntervals[0];
+					auto unfoldedRoot = interval.unfoldedRoot;
+					data0 = XMFLOAT4(1.0, static_cast<float>(std::get<0>(unfoldedRoot)), static_cast<float>(std::get<1>(unfoldedRoot)), static_cast<float>(std::get<2>(unfoldedRoot)));
+					data1 = XMFLOAT3(static_cast<float>(interval.beginpointFraction), static_cast<float>(interval.endpointFraction), static_cast<float>(interval.depth));
+				}
+				VertexPositionData vertexPositionData = {pos, data0, data1};
+				cubeVertices.push_back(vertexPositionData);
+			};
+			appendVertex(0);
+			appendVertex(1);
+			appendVertex(2);
+		}
+
+		m_vertexCount = static_cast<UINT>(cubeVertices.size());
+		const UINT vertexBufferSize = static_cast<UINT>(cubeVertices.size() * sizeof(VertexPositionData));
 
 		// Create the vertex buffer resource in the GPU's default heap and copy vertex data into it using the upload heap.
 		// The upload resource must not be released until after the GPU has finished using it.
@@ -196,7 +239,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		// Upload the vertex buffer to the GPU.
 		{
 			D3D12_SUBRESOURCE_DATA vertexData = {};
-			vertexData.pData = reinterpret_cast<BYTE*>(cubeVertices);
+			vertexData.pData = cubeVertices.data();
 			vertexData.RowPitch = vertexBufferSize;
 			vertexData.SlicePitch = vertexData.RowPitch;
 
@@ -259,8 +302,8 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		// Create vertex/index buffer views.
 		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-		m_vertexBufferView.StrideInBytes = sizeof(VertexPositionColor);
-		m_vertexBufferView.SizeInBytes = sizeof(cubeVertices);
+		m_vertexBufferView.StrideInBytes = sizeof(VertexPositionData);
+		m_vertexBufferView.SizeInBytes = vertexBufferSize;
 
 		// Wait for the command list to finish executing; the vertex/index buffers need to be uploaded to the GPU before the upload resources go out of scope.
 		m_deviceResources->WaitForGpu();
@@ -443,7 +486,7 @@ bool Sample3DSceneRenderer::Render()
 
 		m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-		m_commandList->DrawInstanced(3, 1, 0, 0);
+		m_commandList->DrawInstanced(m_vertexCount, 1, 0, 0);
 
 		// Indicate that the render target will now be used to present when the command list is done executing.
 		CD3DX12_RESOURCE_BARRIER presentResourceBarrier =

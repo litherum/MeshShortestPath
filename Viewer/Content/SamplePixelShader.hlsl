@@ -3,7 +3,8 @@ struct PixelShaderInput {
 	float4 pos : SV_POSITION;
 	float3 worldPosition : POSITION0;
 	nointerpolation float3 vertexWorldPositions[3] : POSITION1;
-	nointerpolation float4 edgeData[3] : COLOR0;
+	nointerpolation float4 data0[3] : COLOR0;
+	nointerpolation float3 data1[3] : COLOR3;
 };
 
 // A pass-through function for the (interpolated) color data.
@@ -13,6 +14,7 @@ float4 main(PixelShaderInput input) : SV_TARGET
 	uint minimumIndex = 0;
 	uint indices[4] = { 0, 1, 2, 0 };
 	for (uint i = 0; i < 3; ++i) {
+		// FIXME: Not quite sure what the best visualization would be here.
 		float3 v0 = input.vertexWorldPositions[indices[i]];
 		float3 v1 = input.vertexWorldPositions[indices[i + 1]];
 		float3 a = input.worldPosition - v0;
@@ -26,5 +28,5 @@ float4 main(PixelShaderInput input) : SV_TARGET
 			minimumIndex = i;
 		}
 	}
-	return float4(input.edgeData[minimumIndex].rgb, 1.0f);
+	return float4(input.data0[minimumIndex].yzw, 1.0f);
 }

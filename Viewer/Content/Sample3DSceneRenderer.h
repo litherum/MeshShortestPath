@@ -50,6 +50,8 @@ namespace Viewer
 		std::vector<byte>									m_pixelShader;
 		D3D12_VERTEX_BUFFER_VIEW							m_vertexBufferView;
 
+		UINT												m_vertexCount;
+
 		// Variables used with the rendering loop.
 		bool	m_loadingComplete;
 		float	m_radiansPerSecond;

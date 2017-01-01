@@ -11,9 +11,10 @@ namespace Viewer
 	};
 
 	// Used to send per-vertex data to the vertex shader.
-	struct VertexPositionColor
+	struct VertexPositionData
 	{
 		DirectX::XMFLOAT3 pos;
-		DirectX::XMFLOAT3 color;
+		DirectX::XMFLOAT4 data0;
+		DirectX::XMFLOAT3 data1;
 	};
 }

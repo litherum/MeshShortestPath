@@ -165,7 +165,7 @@
       <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
       <AdditionalIncludeDirectories>$(ProjectDir);$(IntermediateOutputPath);$(SolutionDir)\MMP;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <FxCompile>
       <ShaderModel>5.1</ShaderModel>
@@ -243,13 +243,7 @@
     <None Include="Viewer_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Content\SamplePixelShader.hlsl">
-      <ShaderType>Pixel</ShaderType>
-    </FxCompile>
-    <FxCompile Include="Content\SampleVertexShader.hlsl">
-      <ShaderType>Vertex</ShaderType>
-    </FxCompile>
-    <FxCompile Include="SampleGeometryShader.hlsl">
+    <FxCompile Include="Content\SampleGeometryShader.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Geometry</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">Geometry</ShaderType>
@@ -262,6 +256,12 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Geometry</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Content\SamplePixelShader.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Content\SampleVertexShader.hlsl">
+      <ShaderType>Vertex</ShaderType>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
