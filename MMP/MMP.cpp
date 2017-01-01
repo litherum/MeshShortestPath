@@ -556,10 +556,10 @@ public:
 			do {
 				std::vector<HalfedgeInterval> intervals;
 				boost::optional<Kernel::FT> maximumExtent;
-				halfedge->opposite()->iterateIntervals([&](const CandidateInterval& interval) {
+				halfedge->iterateIntervals([&](const CandidateInterval& interval) {
 					auto unfoldedRoot = interval.getUnfoldedRoot();
-					auto lowerExtent = 1 - interval.getLowerExtentFraction();
-					auto upperExtent = 1 - interval.getUpperExtentFraction();
+					auto lowerExtent = interval.getLowerExtentFraction();
+					auto upperExtent = interval.getUpperExtentFraction();
 					maximumExtent = maximumExtent ? std::max(maximumExtent.get(), upperExtent) : upperExtent;
 					intervals.push_back({ { unfoldedRoot.x(), unfoldedRoot.y(), unfoldedRoot.z() }, lowerExtent, upperExtent, interval.getDepth() });
 				});

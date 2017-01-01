@@ -156,10 +156,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			{4, 0, 3},
 			{3, 7, 4}};
 
-		std::size_t startingTriangleIndex = 0;
-		double startingU = 1.0 / 3.0;
-		double startingV = 1.0 / 3.0;
-		MMP mmp(pointHeap, triangles, startingTriangleIndex, startingU, startingV);
+		MMP mmp(pointHeap, triangles, 0, 1.0 / 3.0, 1.0 / 3.0);
 		mmp.run();
 		auto intervals = mmp.intervals();
 		assert(triangles.size() == intervals.size());
@@ -186,41 +183,34 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		std::vector<VertexPositionData> cubeVertices;
 		for (std::size_t triangleIndex = 0; triangleIndex < triangles.size(); ++triangleIndex) {
-			for (uint8_t vertexIndex = 0; vertexIndex < 3; ++vertexIndex) {
+			auto appendVertex = [&](uint8_t vertexIndex) {
 				auto point = pointHeap[triangles[triangleIndex][vertexIndex]];
 				auto point2 = pointHeap[triangles[triangleIndex][(vertexIndex + 1) % 3]];
 				auto edgeIntervals = intervals[triangleIndex][vertexIndex];
 				XMFLOAT3 pos(static_cast<float>(std::get<0>(point)), static_cast<float>(std::get<1>(point)), static_cast<float>(std::get<2>(point)));
 				XMFLOAT4 data0;
 				XMFLOAT3 data1;
-				if (triangleIndex == startingTriangleIndex) {
-					auto p0 = pointHeap[std::get<0>(triangles[triangleIndex])];
-					auto p1 = pointHeap[std::get<1>(triangles[triangleIndex])];
-					auto p2 = pointHeap[std::get<2>(triangles[triangleIndex])];
-					std::array<double, 3> v0 = {std::get<0>(p1) - std::get<0>(p0), std::get<1>(p1) - std::get<1>(p0), std::get<2>(p1) - std::get<2>(p0)};
-					std::array<double, 3> v1 = {std::get<0>(p2) - std::get<0>(p0), std::get<1>(p2) - std::get<1>(p0), std::get<2>(p2) - std::get<2>(p0)};
-					auto centerPointX = std::get<0>(p0) + startingU * std::get<0>(v0) + startingV * std::get<0>(v1);
-					auto centerPointY = std::get<1>(p0) + startingU * std::get<1>(v0) + startingV * std::get<1>(v1);
-					auto centerPointZ = std::get<2>(p0) + startingU * std::get<2>(v0) + startingV * std::get<2>(v1);
-					data0 = XMFLOAT4(-1.0f, static_cast<float>(centerPointX), static_cast<float>(centerPointY), static_cast<float>(centerPointZ));
-					data1 = XMFLOAT3(0.f, 0.f, 0.f);
+				// FIXME: Stop disregarding the computed data.
+				auto unfoldedRootX = (std::get<0>(point) + std::get<0>(point2)) / 2;
+				auto unfoldedRootY = (std::get<1>(point) + std::get<1>(point2)) / 2;
+				auto unfoldedRootZ = (std::get<2>(point) + std::get<2>(point2)) / 2;
+				if (edgeIntervals.empty()) {
+					data0 = XMFLOAT4(0, 0, 0, 0);
+					data1 = XMFLOAT3(0, 0, 0);
 				}
 				else {
-					if (edgeIntervals.empty()) {
-						data0 = XMFLOAT4(0.f, 0.f, 0.f, 0.f);
-						data1 = XMFLOAT3(0.f, 0.f, 0.f);
-					}
-					else {
-						assert(edgeIntervals.size() == 1);
-						auto interval = edgeIntervals[0];
-						auto unfoldedRoot = interval.unfoldedRoot;
-						data0 = XMFLOAT4(1.0f, static_cast<float>(std::get<0>(unfoldedRoot)), static_cast<float>(std::get<1>(unfoldedRoot)), static_cast<float>(std::get<2>(unfoldedRoot)));
-						data1 = XMFLOAT3(static_cast<float>(interval.beginpointFraction), static_cast<float>(interval.endpointFraction), static_cast<float>(interval.depth));
-					}
+					assert(edgeIntervals.size() == 1);
+					auto interval = edgeIntervals[0];
+					auto unfoldedRoot = interval.unfoldedRoot;
+					data0 = XMFLOAT4(1.0, static_cast<float>(std::get<0>(unfoldedRoot)), static_cast<float>(std::get<1>(unfoldedRoot)), static_cast<float>(std::get<2>(unfoldedRoot)));
+					data1 = XMFLOAT3(static_cast<float>(interval.beginpointFraction), static_cast<float>(interval.endpointFraction), static_cast<float>(interval.depth));
 				}
-				VertexPositionData vertexPositionData = { pos, data0, data1 };
+				VertexPositionData vertexPositionData = {pos, data0, data1};
 				cubeVertices.push_back(vertexPositionData);
-			}
+			};
+			appendVertex(0);
+			appendVertex(1);
+			appendVertex(2);
 		}
 
 		m_vertexCount = static_cast<UINT>(cubeVertices.size());
