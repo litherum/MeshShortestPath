@@ -17,7 +17,7 @@ struct VertexShaderInput
 // Per-pixel color data passed through the pixel shader.
 struct GeometryShaderInput {
 	float4 pos : SV_POSITION;
-	float3 worldPosition : POSITION0;
+	float3 modelPosition : POSITION0;
 	float4 data0 : COLOR0;
 	float3 data1 : COLOR1;
 };
@@ -29,10 +29,8 @@ GeometryShaderInput main(VertexShaderInput input)
 	float4 pos = float4(input.pos, 1.0f);
 
 	// Transform the vertex position into projected space.
+	output.modelPosition = input.pos;
 	pos = mul(pos, model);
-
-	output.worldPosition = pos.xyz;
-
 	pos = mul(pos, view);
 	pos = mul(pos, projection);
 	output.pos = pos;
