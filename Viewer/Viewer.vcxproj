@@ -228,18 +228,6 @@
     <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.pdb">
       <DeploymentContent>true</DeploymentContent>
     </None>
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL_Core-vc140-mt-gd-4.9.dll">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL_Core-vc140-mt-gd-4.9.pdb">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL_ImageIO-vc140-mt-gd-4.9.dll">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL_ImageIO-vc140-mt-gd-4.9.pdb">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
     <None Include="Viewer_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>

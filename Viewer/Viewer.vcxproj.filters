@@ -78,10 +78,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Viewer_TemporaryKey.pfx" />
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL_Core-vc140-mt-gd-4.9.dll" />
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL_Core-vc140-mt-gd-4.9.pdb" />
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL_ImageIO-vc140-mt-gd-4.9.dll" />
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL_ImageIO-vc140-mt-gd-4.9.pdb" />
     <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.dll" />
     <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.pdb" />
   </ItemGroup>
