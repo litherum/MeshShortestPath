@@ -12,7 +12,7 @@ float4 main(PixelShaderInput input) : SV_TARGET
 {
 	float minimumDistance = -1;
 	uint minimumIndex = 0;
-	uint indices[4] = { 0, 1, 2, 0 };
+	uint indices[4] = {0, 1, 2, 0};
 	for (uint i = 0; i < 3; ++i) {
 		if (input.data0[i].x == 1) {
 			float3 unfoldedRoot = input.data0[i].yzw;
