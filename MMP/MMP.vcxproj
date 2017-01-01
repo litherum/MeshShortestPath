@@ -183,11 +183,14 @@
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <CompileAsWinRT>false</CompileAsWinRT>
+      <AdditionalIncludeDirectories>C:\Users\lithe\Documents\src\CGAL-4.9\prefix\include;C:\Users\lithe\Documents\src\CGAL-4.9\include;C:\Users\lithe\Documents\src\boost_1_62_0\prefix\include\boost-1_62;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;MMP_EXPORTS;NOMINMAX;_USE_MATH_DEFINES;CGAL_CHECK_EXPENSIVE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+      <AdditionalLibraryDirectories>C:\Users\lithe\Documents\src\CGAL-4.9\prefix\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
