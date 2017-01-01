@@ -194,9 +194,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 				auto unfoldedRootX = (std::get<0>(point) + std::get<0>(point2)) / 2;
 				auto unfoldedRootY = (std::get<1>(point) + std::get<1>(point2)) / 2;
 				auto unfoldedRootZ = (std::get<2>(point) + std::get<2>(point2)) / 2;
-				data0 = XMFLOAT4(1, static_cast<float>(unfoldedRootX), static_cast<float>(unfoldedRootY), static_cast<float>(unfoldedRootZ));
-				data1 = XMFLOAT3(0, 1, 0);
-				/*if (edgeIntervals.empty()) {
+				if (edgeIntervals.empty()) {
 					data0 = XMFLOAT4(0, 0, 0, 0);
 					data1 = XMFLOAT3(0, 0, 0);
 				}
@@ -206,7 +204,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 					auto unfoldedRoot = interval.unfoldedRoot;
 					data0 = XMFLOAT4(1.0, static_cast<float>(std::get<0>(unfoldedRoot)), static_cast<float>(std::get<1>(unfoldedRoot)), static_cast<float>(std::get<2>(unfoldedRoot)));
 					data1 = XMFLOAT3(static_cast<float>(interval.beginpointFraction), static_cast<float>(interval.endpointFraction), static_cast<float>(interval.depth));
-				}*/
+				}
 				VertexPositionData vertexPositionData = {pos, data0, data1};
 				cubeVertices.push_back(vertexPositionData);
 			};
