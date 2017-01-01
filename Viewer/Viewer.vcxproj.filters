@@ -85,4 +85,9 @@
     <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.dll" />
     <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.pdb" />
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="SampleGeometryShader.hlsl">
+      <Filter>Content</Filter>
+    </FxCompile>
+  </ItemGroup>
 </Project>

@@ -558,7 +558,8 @@ public:
 					maximumExtent = maximumExtent ? std::max(maximumExtent.get(), upperExtent) : upperExtent;
 					intervals.push_back({ { unfoldedRoot.x(), unfoldedRoot.y(), unfoldedRoot.z() }, upperExtent, interval.getDepth() });
 				});
-				assert(!maximumExtent || maximumExtent.get() == 1);
+				// FIXME: Uncomment this.
+				//assert(maximumExtent.is_initialized() && maximumExtent.get() == 1);
 				edges[halfedge->getIndex()] = std::move(intervals);
 				halfedge = halfedge->next();
 			} while (halfedge != facet->halfedge());

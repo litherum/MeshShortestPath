@@ -31,7 +31,7 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 	LoadState();
 	ZeroMemory(&m_constantBufferData, sizeof(m_constantBufferData));
 
-	::MMP mmp({
+	MMP::PointHeap pointHeap = {
 		{0, 0, 1},
 		{0, 1, 1},
 		{1, 1, 1},
@@ -39,7 +39,8 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 		{0, 0, 0},
 		{0, 1, 0},
 		{1, 1, 0},
-		{1, 0, 0}}, {
+		{1, 0, 0}};
+	MMP::TriangleIndices triangles = {
 		// Front
 		{0, 1, 2},
 		{2, 3, 0},
@@ -57,10 +58,12 @@ Sample3DSceneRenderer::Sample3DSceneRenderer(const std::shared_ptr<DX::DeviceRes
 		{6, 2, 1},
 		// Bottom
 		{4, 0, 3},
-		{3, 7, 4}},
-		0, 1.0 / 3.0, 1.0 / 3.0);
+		{3, 7, 4}};
+
+	MMP mmp(pointHeap, triangles, 0, 1.0 / 3.0, 1.0 / 3.0);
 	mmp.run();
-	for (const auto& intervals : mmp.intervals()) {
+	auto intervals = mmp.intervals();
+	for (const auto& intervals : intervals) {
 	}
 
 	CreateDeviceDependentResources();
@@ -107,12 +110,16 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		m_vertexShader = fileData;
 	});
 
+	auto createGSTask = DX::ReadDataAsync(L"SampleGeometryShader.cso").then([this](std::vector<byte>& fileData) {
+		m_geometryShader = fileData;
+	});
+
 	auto createPSTask = DX::ReadDataAsync(L"SamplePixelShader.cso").then([this](std::vector<byte>& fileData) {
 		m_pixelShader = fileData;
 	});
 
 	// Create the pipeline state once the shaders are loaded.
-	auto createPipelineStateTask = (createPSTask && createVSTask).then([this]() {
+	auto createPipelineStateTask = (createPSTask && createGSTask && createVSTask).then([this]() {
 
 		static const D3D12_INPUT_ELEMENT_DESC inputLayout[] =
 		{
@@ -123,8 +130,9 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
 		state.InputLayout = { inputLayout, _countof(inputLayout) };
 		state.pRootSignature = m_rootSignature.Get();
-        state.VS = CD3DX12_SHADER_BYTECODE(&m_vertexShader[0], m_vertexShader.size());
-        state.PS = CD3DX12_SHADER_BYTECODE(&m_pixelShader[0], m_pixelShader.size());
+		state.VS = CD3DX12_SHADER_BYTECODE(&m_vertexShader[0], m_vertexShader.size());
+		state.GS = CD3DX12_SHADER_BYTECODE(&m_geometryShader[0], m_geometryShader.size());
+		state.PS = CD3DX12_SHADER_BYTECODE(&m_pixelShader[0], m_pixelShader.size());
 		state.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		state.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		state.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
@@ -139,6 +147,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 
 		// Shader data can be deleted once the pipeline state is created.
 		m_vertexShader.clear();
+		m_geometryShader.clear();
 		m_pixelShader.clear();
 	});
 
@@ -151,15 +160,9 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
         NAME_D3D12_OBJECT(m_commandList);
 
 		// Cube vertices. Each vertex has a position and a color.
-		VertexPositionColor cubeVertices[] =
-		{
-			{ XMFLOAT3(-0.5f, -0.5f, -0.5f), XMFLOAT3(0.0f, 0.0f, 0.0f) },
+		VertexPositionColor cubeVertices[] = {
 			{ XMFLOAT3(-0.5f, -0.5f,  0.5f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-			{ XMFLOAT3(-0.5f,  0.5f, -0.5f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
 			{ XMFLOAT3(-0.5f,  0.5f,  0.5f), XMFLOAT3(0.0f, 1.0f, 1.0f) },
-			{ XMFLOAT3(0.5f, -0.5f, -0.5f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
-			{ XMFLOAT3(0.5f, -0.5f,  0.5f), XMFLOAT3(1.0f, 0.0f, 1.0f) },
-			{ XMFLOAT3(0.5f,  0.5f, -0.5f), XMFLOAT3(1.0f, 1.0f, 0.0f) },
 			{ XMFLOAT3(0.5f,  0.5f,  0.5f), XMFLOAT3(1.0f, 1.0f, 1.0f) },
 		};
 
@@ -202,69 +205,6 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			CD3DX12_RESOURCE_BARRIER vertexBufferResourceBarrier =
 				CD3DX12_RESOURCE_BARRIER::Transition(m_vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 			m_commandList->ResourceBarrier(1, &vertexBufferResourceBarrier);
-		}
-
-		// Load mesh indices. Each trio of indices represents a triangle to be rendered on the screen.
-		// For example: 0,2,1 means that the vertices with indexes 0, 2 and 1 from the vertex buffer compose the
-		// first triangle of this mesh.
-		unsigned short cubeIndices[] =
-		{
-			0, 2, 1, // -x
-			1, 2, 3,
-
-			4, 5, 6, // +x
-			5, 7, 6,
-
-			0, 1, 5, // -y
-			0, 5, 4,
-
-			2, 6, 7, // +y
-			2, 7, 3,
-
-			0, 4, 6, // -z
-			0, 6, 2,
-
-			1, 3, 7, // +z
-			1, 7, 5,
-		};
-
-		const UINT indexBufferSize = sizeof(cubeIndices);
-
-		// Create the index buffer resource in the GPU's default heap and copy index data into it using the upload heap.
-		// The upload resource must not be released until after the GPU has finished using it.
-		Microsoft::WRL::ComPtr<ID3D12Resource> indexBufferUpload;
-
-		CD3DX12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize);
-		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
-			&defaultHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&indexBufferDesc,
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr,
-			IID_PPV_ARGS(&m_indexBuffer)));
-
-		DX::ThrowIfFailed(d3dDevice->CreateCommittedResource(
-			&uploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&indexBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&indexBufferUpload)));
-
-		NAME_D3D12_OBJECT(m_indexBuffer);
-
-		// Upload the index buffer to the GPU.
-		{
-			D3D12_SUBRESOURCE_DATA indexData = {};
-			indexData.pData = reinterpret_cast<BYTE*>(cubeIndices);
-			indexData.RowPitch = indexBufferSize;
-			indexData.SlicePitch = indexData.RowPitch;
-
-			UpdateSubresources(m_commandList.Get(), m_indexBuffer.Get(), indexBufferUpload.Get(), 0, 0, 1, &indexData);
-
-			CD3DX12_RESOURCE_BARRIER indexBufferResourceBarrier =
-				CD3DX12_RESOURCE_BARRIER::Transition(m_indexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDEX_BUFFER);
-			m_commandList->ResourceBarrier(1, &indexBufferResourceBarrier);
 		}
 
 		// Create a descriptor heap for the constant buffers.
@@ -321,10 +261,6 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
 		m_vertexBufferView.StrideInBytes = sizeof(VertexPositionColor);
 		m_vertexBufferView.SizeInBytes = sizeof(cubeVertices);
-
-		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-		m_indexBufferView.SizeInBytes = sizeof(cubeIndices);
-		m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 
 		// Wait for the command list to finish executing; the vertex/index buffers need to be uploaded to the GPU before the upload resources go out of scope.
 		m_deviceResources->WaitForGpu();
@@ -507,8 +443,7 @@ bool Sample3DSceneRenderer::Render()
 
 		m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-		m_commandList->IASetIndexBuffer(&m_indexBufferView);
-		m_commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+		m_commandList->DrawInstanced(3, 1, 0, 0);
 
 		// Indicate that the render target will now be used to present when the command list is done executing.
 		CD3DX12_RESOURCE_BARRIER presentResourceBarrier =
