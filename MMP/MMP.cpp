@@ -72,7 +72,7 @@ public:
 		auto calculateTrimPoints = [](const CandidateInterval& a, const CandidateInterval& b) -> boost::optional<Kernel::FT> {
 			auto tiePoints = calculateTiePoints(a, b);
 			auto endIterator = std::copy_if(tiePoints.begin(), tiePoints.end(), tiePoints.begin(), [&](Kernel::FT scalar) {
-				return scalar >= a.lowerExtent && scalar >= a.upperExtent &&
+				return scalar >= a.lowerExtent && scalar <= a.upperExtent &&
 					scalar >= b.lowerExtent && scalar <= b.upperExtent;
 			});
 			tiePoints.erase(endIterator, tiePoints.end());

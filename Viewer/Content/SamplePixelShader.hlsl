@@ -4,13 +4,13 @@ struct PixelShaderInput {
 	float3 modelPosition : POSITION0;
 	nointerpolation float3 vertexModelPositions[3] : POSITION1;
 	nointerpolation float4 data0[3] : COLOR0;
-	nointerpolation float3 data1[3] : COLOR4;
-	nointerpolation float3 data2[3] : COLOR7;
-	nointerpolation float3 data3[3] : COLOR10;
+	nointerpolation float4 data1[3] : COLOR4;
+	nointerpolation float4 data2[3] : COLOR8;
+	nointerpolation float4 data3[3] : COLOR12;
+	nointerpolation float3 data4[3] : COLOR16;
 };
 
 float2 computeDistance(float3 modelPosition, float3 vertex0, float3 vertex1, float3 unfoldedRoot, float beginpointFraction, float endpointFraction, float depth) {
-
 	float3 edgeVector = vertex1 - vertex0;
 	float3 threshold0 = vertex0 + (beginpointFraction * edgeVector);
 	float3 threshold1 = vertex0 + (endpointFraction * edgeVector);
@@ -45,7 +45,7 @@ float4 main(PixelShaderInput input) : SV_TARGET
 		}
 		else if (intervalCount == 2) {
 			float2 computedDistance1 = computeDistance(input.modelPosition, vertex0, vertex1, input.data0[i].yzw, input.data1[i].x, input.data1[i].y, input.data1[i].z);
-			float2 computedDistance2 = computeDistance(input.modelPosition, vertex0, vertex1, input.data2[i], input.data3[i].x, input.data3[i].y, input.data3[i].z);
+			float2 computedDistance2 = computeDistance(input.modelPosition, vertex0, vertex1, float3(input.data1[i].w, input.data2[i].xy), input.data2[i].z, input.data2[i].w, input.data3[i].x);
 			if (computedDistance1.x > 0.5) {
 				// The point is inside the arc.
 				float currentDistance = computedDistance1.y;
@@ -55,6 +55,29 @@ float4 main(PixelShaderInput input) : SV_TARGET
 			if (computedDistance2.x > 0.5) {
 				// The point is inside the arc.
 				float currentDistance = computedDistance2.y;
+				if (minimumDistance < 0 || currentDistance < minimumDistance)
+					minimumDistance = currentDistance;
+			}
+		}
+		else if (intervalCount == 3) {
+			float2 computedDistance1 = computeDistance(input.modelPosition, vertex0, vertex1, input.data0[i].yzw, input.data1[i].x, input.data1[i].y, input.data1[i].z);
+			float2 computedDistance2 = computeDistance(input.modelPosition, vertex0, vertex1, float3(input.data1[i].w, input.data2[i].xy), input.data2[i].z, input.data2[i].w, input.data3[i].x);
+			float2 computedDistance3 = computeDistance(input.modelPosition, vertex0, vertex1, input.data3[i].yzw, input.data4[i].x, input.data4[i].y, input.data4[i].z);
+			if (computedDistance1.x > 0.5) {
+				// The point is inside the arc.
+				float currentDistance = computedDistance1.y;
+				if (minimumDistance < 0 || currentDistance < minimumDistance)
+					minimumDistance = currentDistance;
+			}
+			if (computedDistance2.x > 0.5) {
+				// The point is inside the arc.
+				float currentDistance = computedDistance2.y;
+				if (minimumDistance < 0 || currentDistance < minimumDistance)
+					minimumDistance = currentDistance;
+			}
+			if (computedDistance3.x > 0.5) {
+				// The point is inside the arc.
+				float currentDistance = computedDistance3.y;
 				if (minimumDistance < 0 || currentDistance < minimumDistance)
 					minimumDistance = currentDistance;
 			}

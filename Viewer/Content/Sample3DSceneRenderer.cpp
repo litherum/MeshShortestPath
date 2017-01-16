@@ -92,9 +92,10 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12 + 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 2, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12 + 16 + 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 3, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12 + 16 + 12 + 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12 + 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12 + 16 + 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12 + 16 + 16 + 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 4, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12 + 16 + 16 + 16 + 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
@@ -181,7 +182,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		}
 		outputStream << "Maximum number of intervals per edge: " << maximum << std::endl;
 		OutputDebugStringA(outputStream.str().c_str());
-		assert(maximum <= 2);
+		assert(maximum <= 3);
 
 		std::vector<VertexPositionData> cubeVertices;
 		for (std::size_t triangleIndex = 0; triangleIndex < triangles.size(); ++triangleIndex) {
@@ -191,35 +192,52 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 				auto edgeIntervals = intervals[triangleIndex][vertexIndex];
 				XMFLOAT3 pos(static_cast<float>(std::get<0>(point)), static_cast<float>(std::get<1>(point)), static_cast<float>(std::get<2>(point)));
 				XMFLOAT4 data0;
-				XMFLOAT3 data1;
-				XMFLOAT3 data2;
-				XMFLOAT3 data3;
+				XMFLOAT4 data1;
+				XMFLOAT4 data2;
+				XMFLOAT4 data3;
+				XMFLOAT3 data4;
 				if (edgeIntervals.empty()) {
 					data0 = XMFLOAT4(0, 0, 0, 0);
-					data1 = XMFLOAT3(0, 0, 0);
-					data2 = XMFLOAT3(0, 0, 0);
-					data3 = XMFLOAT3(0, 0, 0);
+					data1 = XMFLOAT4(0, 0, 0, 0);
+					data2 = XMFLOAT4(0, 0, 0, 0);
+					data3 = XMFLOAT4(0, 0, 0, 0);
+					data4 = XMFLOAT3(0, 0, 0);
 				}
 				else if (edgeIntervals.size() == 1) {
 					auto interval = edgeIntervals[0];
 					auto unfoldedRoot = interval.unfoldedRoot;
 					data0 = XMFLOAT4(1.0, static_cast<float>(std::get<0>(unfoldedRoot)), static_cast<float>(std::get<1>(unfoldedRoot)), static_cast<float>(std::get<2>(unfoldedRoot)));
-					data1 = XMFLOAT3(static_cast<float>(interval.beginpointFraction), static_cast<float>(interval.endpointFraction), static_cast<float>(interval.depth));
-					data2 = XMFLOAT3(0, 0, 0);
-					data3 = XMFLOAT3(0, 0, 0);
+					data1 = XMFLOAT4(static_cast<float>(interval.beginpointFraction), static_cast<float>(interval.endpointFraction), static_cast<float>(interval.depth), 0);
+					data2 = XMFLOAT4(0, 0, 0, 0);
+					data3 = XMFLOAT4(0, 0, 0, 0);
+					data4 = XMFLOAT3(0, 0, 0);
 				}
-				else {
-					assert(edgeIntervals.size() == 2);
+				else if (edgeIntervals.size() == 2) {
 					auto interval1 = edgeIntervals[0];
 					auto unfoldedRoot1 = interval1.unfoldedRoot;
-					data0 = XMFLOAT4(1.0, static_cast<float>(std::get<0>(unfoldedRoot1)), static_cast<float>(std::get<1>(unfoldedRoot1)), static_cast<float>(std::get<2>(unfoldedRoot1)));
-					data1 = XMFLOAT3(static_cast<float>(interval1.beginpointFraction), static_cast<float>(interval1.endpointFraction), static_cast<float>(interval1.depth));
 					auto interval2 = edgeIntervals[1];
 					auto unfoldedRoot2 = interval2.unfoldedRoot;
-					data2 = XMFLOAT3(static_cast<float>(std::get<0>(unfoldedRoot2)), static_cast<float>(std::get<1>(unfoldedRoot2)), static_cast<float>(std::get<2>(unfoldedRoot2)));
-					data3 = XMFLOAT3(static_cast<float>(interval2.beginpointFraction), static_cast<float>(interval2.endpointFraction), static_cast<float>(interval2.depth));
+					data0 = XMFLOAT4(2.0, static_cast<float>(std::get<0>(unfoldedRoot1)), static_cast<float>(std::get<1>(unfoldedRoot1)), static_cast<float>(std::get<2>(unfoldedRoot1)));
+					data1 = XMFLOAT4(static_cast<float>(interval1.beginpointFraction), static_cast<float>(interval1.endpointFraction), static_cast<float>(interval1.depth), static_cast<float>(std::get<0>(unfoldedRoot2)));
+					data2 = XMFLOAT4(static_cast<float>(std::get<1>(unfoldedRoot2)), static_cast<float>(std::get<2>(unfoldedRoot2)), static_cast<float>(interval2.beginpointFraction), static_cast<float>(interval2.endpointFraction));
+					data3 = XMFLOAT4(static_cast<float>(interval2.depth), 0, 0, 0);
+					data4 = XMFLOAT3(0, 0, 0);
 				}
-				VertexPositionData vertexPositionData = {pos, data0, data1, data2, data3};
+				else {
+					assert(edgeIntervals.size() == 3);
+					auto interval1 = edgeIntervals[0];
+					auto unfoldedRoot1 = interval1.unfoldedRoot;
+					auto interval2 = edgeIntervals[1];
+					auto unfoldedRoot2 = interval2.unfoldedRoot;
+					auto interval3 = edgeIntervals[2];
+					auto unfoldedRoot3 = interval3.unfoldedRoot;
+					data0 = XMFLOAT4(3.0, static_cast<float>(std::get<0>(unfoldedRoot1)), static_cast<float>(std::get<1>(unfoldedRoot1)), static_cast<float>(std::get<2>(unfoldedRoot1)));
+					data1 = XMFLOAT4(static_cast<float>(interval1.beginpointFraction), static_cast<float>(interval1.endpointFraction), static_cast<float>(interval1.depth), static_cast<float>(std::get<0>(unfoldedRoot2)));
+					data2 = XMFLOAT4(static_cast<float>(std::get<1>(unfoldedRoot2)), static_cast<float>(std::get<2>(unfoldedRoot2)), static_cast<float>(interval2.beginpointFraction), static_cast<float>(interval2.endpointFraction));
+					data3 = XMFLOAT4(static_cast<float>(interval2.depth), static_cast<float>(std::get<0>(unfoldedRoot3)), static_cast<float>(std::get<1>(unfoldedRoot3)), static_cast<float>(std::get<2>(unfoldedRoot3)));
+					data4 = XMFLOAT3(static_cast<float>(interval3.beginpointFraction), static_cast<float>(interval3.endpointFraction), static_cast<float>(interval3.depth));
+				}
+				VertexPositionData vertexPositionData = {pos, data0, data1, data2, data3, data4};
 				cubeVertices.push_back(vertexPositionData);
 			}
 		}
