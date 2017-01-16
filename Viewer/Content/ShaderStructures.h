@@ -16,5 +16,7 @@ namespace Viewer
 		DirectX::XMFLOAT3 pos;
 		DirectX::XMFLOAT4 data0;
 		DirectX::XMFLOAT3 data1;
+		DirectX::XMFLOAT3 data2;
+		DirectX::XMFLOAT3 data3;
 	};
 }

@@ -93,6 +93,8 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 			{ "COLOR", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12 + 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 2, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12 + 16 + 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 3, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12 + 16 + 12 + 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC state = {};
@@ -172,14 +174,14 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 				auto p1 = pointHeap[triangle[(edgeIndex + 1) % 3]];
 				outputStream << "    Edge from (" << std::get<0>(p0) << ", " << std::get<1>(p0) << ", " << std::get<2>(p0) << ") to (" << std::get<0>(p1) << ", " << std::get<1>(p1) << ", " << std::get<2>(p1) << ")" << std::endl;
 				for (auto& interval : edge) {
-					outputStream << "        " << interval.beginpointFraction << " " << interval.endpointFraction << std::endl;
+					outputStream << "        " << interval.beginpointFraction << " " << interval.endpointFraction << " Unfolded root: (" << std::get<0>(interval.unfoldedRoot) << ", " << std::get<1>(interval.unfoldedRoot) << ", " << std::get<2>(interval.unfoldedRoot) << ")" << std::endl;
 				}
 				maximum = std::max(maximum, edge.size());
 			}
 		}
 		outputStream << "Maximum number of intervals per edge: " << maximum << std::endl;
 		OutputDebugStringA(outputStream.str().c_str());
-		assert(maximum <= 1);
+		assert(maximum <= 2);
 
 		std::vector<VertexPositionData> cubeVertices;
 		for (std::size_t triangleIndex = 0; triangleIndex < triangles.size(); ++triangleIndex) {
@@ -190,18 +192,34 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 				XMFLOAT3 pos(static_cast<float>(std::get<0>(point)), static_cast<float>(std::get<1>(point)), static_cast<float>(std::get<2>(point)));
 				XMFLOAT4 data0;
 				XMFLOAT3 data1;
+				XMFLOAT3 data2;
+				XMFLOAT3 data3;
 				if (edgeIntervals.empty()) {
 					data0 = XMFLOAT4(0, 0, 0, 0);
 					data1 = XMFLOAT3(0, 0, 0);
+					data2 = XMFLOAT3(0, 0, 0);
+					data3 = XMFLOAT3(0, 0, 0);
 				}
-				else {
-					assert(edgeIntervals.size() == 1);
+				else if (edgeIntervals.size() == 1) {
 					auto interval = edgeIntervals[0];
 					auto unfoldedRoot = interval.unfoldedRoot;
 					data0 = XMFLOAT4(1.0, static_cast<float>(std::get<0>(unfoldedRoot)), static_cast<float>(std::get<1>(unfoldedRoot)), static_cast<float>(std::get<2>(unfoldedRoot)));
 					data1 = XMFLOAT3(static_cast<float>(interval.beginpointFraction), static_cast<float>(interval.endpointFraction), static_cast<float>(interval.depth));
+					data2 = XMFLOAT3(0, 0, 0);
+					data3 = XMFLOAT3(0, 0, 0);
 				}
-				VertexPositionData vertexPositionData = {pos, data0, data1};
+				else {
+					assert(edgeIntervals.size() == 2);
+					auto interval1 = edgeIntervals[0];
+					auto unfoldedRoot1 = interval1.unfoldedRoot;
+					data0 = XMFLOAT4(1.0, static_cast<float>(std::get<0>(unfoldedRoot1)), static_cast<float>(std::get<1>(unfoldedRoot1)), static_cast<float>(std::get<2>(unfoldedRoot1)));
+					data1 = XMFLOAT3(static_cast<float>(interval1.beginpointFraction), static_cast<float>(interval1.endpointFraction), static_cast<float>(interval1.depth));
+					auto interval2 = edgeIntervals[1];
+					auto unfoldedRoot2 = interval2.unfoldedRoot;
+					data2 = XMFLOAT3(static_cast<float>(std::get<0>(unfoldedRoot2)), static_cast<float>(std::get<1>(unfoldedRoot2)), static_cast<float>(std::get<2>(unfoldedRoot2)));
+					data3 = XMFLOAT3(static_cast<float>(interval2.beginpointFraction), static_cast<float>(interval2.endpointFraction), static_cast<float>(interval2.depth));
+				}
+				VertexPositionData vertexPositionData = {pos, data0, data1, data2, data3};
 				cubeVertices.push_back(vertexPositionData);
 			}
 		}

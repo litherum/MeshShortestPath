@@ -21,14 +21,25 @@ template <class Refs>
 class MMPHalfedge : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 public:
 	void insertInterval(CandidateInterval& interval, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
+
+		std::ostringstream stream;
+		auto start = opposite()->vertex()->point();
+		auto end = vertex()->point();
+		stream << "Inserting into halfedge (" << start.x() << ", " << start.y() << ", " << start.z() << ") -> (" << end.x() << ", " << end.y() << ", " << end.z() << ")" << std::endl;
+		stream << "Predecessor info: " << predecessor.frontierPoint << " " << (predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next()) << std::endl;
+		for (auto& interval : intervals) {
+			stream << "Interval: " << interval->getLowerExtentFraction() << " - " << interval->getUpperExtentFraction() << " Frontier Point: " << interval->frontierPoint << std::endl;
+		}
+		OutputDebugStringA(stream.str().c_str());
+
 		CandidateInterval::AccessPoint searchFor = {1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next()};
 
 		auto searchComparison = [](const CandidateInterval::AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
 			if (existing->accessPoint.initialSide && !probe.initialSide)
-				return false;
-			if (!existing->accessPoint.initialSide && probe.initialSide)
 				return true;
-			return existing->accessPoint.location > probe.location;
+			if (!existing->accessPoint.initialSide && probe.initialSide)
+				return false;
+			return existing->accessPoint.location < probe.location;
 		};
 
 		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
@@ -44,6 +55,10 @@ public:
 			}
 			return begin;
 		};
+
+		stream.clear();
+		stream << (location == intervals.end()) << std::endl;
+		OutputDebugStringA(stream.str().c_str());
 
 		auto beginDeleting = findEndOfDominatedIntervals(std::make_reverse_iterator(location), intervals.rend(), &CandidateInterval::getLowerExtent);
 		auto endDeleting = findEndOfDominatedIntervals(location, intervals.end(), &CandidateInterval::getUpperExtent);
@@ -501,7 +516,7 @@ static std::vector<Kernel::FT> calculateTiePoints(const CandidateInterval& a, co
 	auto result = calculateTiePoints(d1, r1, distance, d2, r2);
 	// The result is distances, but we need scalar multipliers
 	std::transform(result.begin(), result.end(), result.begin(), [&](Kernel::FT tiePointDistance) {
-		return projectionScalarA + distance / std::sqrt(vector.squared_length());
+		return projectionScalarA + tiePointDistance / std::sqrt(vector.squared_length());
 	});
 	return result;
 }
@@ -557,6 +572,7 @@ public:
 				std::vector<HalfedgeInterval> intervals;
 				boost::optional<Kernel::FT> maximumExtent;
 				halfedge->iterateIntervals([&](const CandidateInterval& interval) {
+					assert(!interval.isDeleted());
 					auto unfoldedRoot = interval.getUnfoldedRoot();
 					auto lowerExtent = interval.getLowerExtentFraction();
 					auto upperExtent = interval.getUpperExtentFraction();
@@ -716,6 +732,15 @@ private:
 				return;
 			}
 
+			std::ostringstream stream;
+			auto source = event.getCandidateInterval()->getHalfedge()->opposite()->vertex()->point();
+			auto dest = event.getCandidateInterval()->getHalfedge()->vertex()->point();
+			auto l = event.getCandidateInterval()->getLowerExtentFraction();
+			auto r = event.getCandidateInterval()->getUpperExtentFraction();
+			stream << "Encountering candidate interval (" << source.x() << ", " << source.y() << ", " << source.z() << ")";
+			stream << " -> (" << dest.x() << ", " << dest.y() << ", " << dest.z() << ") " << l << " " << r << std::endl;
+			OutputDebugStringA(stream.str().c_str());
+
 			// FIXME: Possibly label the event
 			impl.propagate(*event.getCandidateInterval());
 		}
@@ -868,7 +893,7 @@ private:
 			else
 				return boost::none;
 		};
-		return{ project(next), project(nextnext) };
+		return {project(next), project(nextnext)};
 	}
 
 	Polyhedron polyhedron;
