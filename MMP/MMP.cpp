@@ -586,6 +586,18 @@ public:
 			} while (halfedge != facet->halfedge());
 		}
 		OutputDebugStringA(ss.str().c_str());
+		// The starting facet has no incoming edges, so we have to handle it here.
+		auto halfedge = startingFacet->halfedge();
+		do {
+			std::vector<HalfedgeInterval> intervals;
+			halfedge->iterateIntervals([&](const CandidateInterval& interval) {
+				auto lowerExtent = interval.getLowerExtentFraction();
+				auto upperExtent = interval.getUpperExtentFraction();
+				intervals.push_back({ {startingPoint.x(), startingPoint.y(), startingPoint.z()}, lowerExtent, upperExtent, 0 });
+			});
+			result[startingFacet->getIndex()][halfedge->getIndex()] = std::move(intervals);
+			halfedge = halfedge->next();
+		} while (halfedge != startingFacet->halfedge());
 		return result;
 	}
 
