@@ -21,7 +21,6 @@ template <class Refs>
 class MMPHalfedge : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 public:
 	void insertInterval(CandidateInterval& interval, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
-
 		std::ostringstream stream;
 		auto start = opposite()->vertex()->point();
 		auto end = vertex()->point();
@@ -56,7 +55,7 @@ public:
 			return begin;
 		};
 
-		stream.clear();
+		stream = std::ostringstream();
 		stream << (location == intervals.end()) << std::endl;
 		OutputDebugStringA(stream.str().c_str());
 
