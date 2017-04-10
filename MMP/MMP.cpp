@@ -563,28 +563,29 @@ public:
 	}
 
 	std::vector<std::array<std::vector<HalfedgeInterval>, 3>> intervals() const {
+		std::ostringstream ss;
 		std::vector<std::array<std::vector<HalfedgeInterval>, 3>> result(polyhedron.size_of_facets());
 		for (auto facet = polyhedron.facets_begin(); facet != polyhedron.facets_end(); ++facet) {
+			ss << "Encountering triangle " << facet->getIndex() << std::endl;
 			std::array<std::vector<HalfedgeInterval>, 3> edges;
 			auto halfedge = facet->halfedge();
 			do {
+				auto opposite = halfedge->opposite();
+				ss << "Halfedge " << static_cast<int>(halfedge->getIndex()) << " opposite triangle: " << opposite->facet()->getIndex() << " opposite halfedge: " << static_cast<int>(opposite->getIndex()) << " Halfedge coordinates: (" << opposite->vertex()->point().x() << ", " << opposite->vertex()->point().y() << ", " << opposite->vertex()->point().z() << ") (" << halfedge->vertex()->point().x() << ", " << halfedge->vertex()->point().y() << ", " << halfedge->vertex()->point().z() << ")" << std::endl;
 				std::vector<HalfedgeInterval> intervals;
-				boost::optional<Kernel::FT> maximumExtent;
 				halfedge->iterateIntervals([&](const CandidateInterval& interval) {
 					assert(!interval.isDeleted());
 					auto unfoldedRoot = interval.getUnfoldedRoot();
 					auto lowerExtent = interval.getLowerExtentFraction();
 					auto upperExtent = interval.getUpperExtentFraction();
-					maximumExtent = maximumExtent ? std::max(maximumExtent.get(), upperExtent) : upperExtent;
-					intervals.push_back({ { unfoldedRoot.x(), unfoldedRoot.y(), unfoldedRoot.z() }, lowerExtent, upperExtent, interval.getDepth() });
+					auto newUnfoldedRoot = calculateUnfoldedRoot(interval.getUnfoldedRoot(), halfedge->facet()->plane(), opposite->facet()->plane(), Kernel::Line_3(halfedge->vertex()->point(), opposite->vertex()->point()));
+					intervals.push_back({ { newUnfoldedRoot.x(), newUnfoldedRoot.y(), newUnfoldedRoot.z() }, 1 - upperExtent, 1 - lowerExtent, interval.getDepth() });
 				});
-				// FIXME: Uncomment this.
-				//assert(maximumExtent.is_initialized() && maximumExtent.get() == 1);
-				edges[halfedge->getIndex()] = std::move(intervals);
+				result[opposite->facet()->getIndex()][opposite->getIndex()] = std::move(intervals);
 				halfedge = halfedge->next();
 			} while (halfedge != facet->halfedge());
-			result[facet->getIndex()] = std::move(edges);
 		}
+		OutputDebugStringA(ss.str().c_str());
 		return result;
 	}
 
@@ -781,7 +782,7 @@ private:
 		}
 	}
 
-	Polyhedron::Point calculateUnfoldedRoot(Polyhedron::Point oldUnfoldedRoot, Polyhedron::Plane_3 originalPlane, Polyhedron::Plane_3 newPlane, Kernel::Line_3 intersection) {
+	Polyhedron::Point calculateUnfoldedRoot(Polyhedron::Point oldUnfoldedRoot, Polyhedron::Plane_3 originalPlane, Polyhedron::Plane_3 newPlane, Kernel::Line_3 intersection) const {
 		auto originalNormal = originalPlane.orthogonal_vector();
 		originalNormal = originalNormal / std::sqrt(originalNormal.squared_length());
 
