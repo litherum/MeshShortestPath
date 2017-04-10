@@ -78,9 +78,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Viewer_TemporaryKey.pfx" />
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-4.9.dll" />
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.dll" />
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.pdb" />
+    <None Include="..\..\..\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-4.9.dll" />
+    <None Include="..\..\..\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.dll" />
+    <None Include="..\..\..\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.pdb" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Content\SampleGeometryShader.hlsl">

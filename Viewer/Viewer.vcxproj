@@ -181,13 +181,13 @@
       <SubType>Designer</SubType>
       <DeploymentContent>true</DeploymentContent>
     </AppxManifest>
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-4.9.dll">
+    <None Include="..\..\..\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-4.9.dll">
       <DeploymentContent>true</DeploymentContent>
     </None>
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.dll">
+    <None Include="..\..\..\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.dll">
       <DeploymentContent>true</DeploymentContent>
     </None>
-    <None Include="..\..\..\..\..\..\Documents\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.pdb">
+    <None Include="..\..\..\src\CGAL-4.9\prefix\bin\CGAL-vc140-mt-gd-4.9.pdb">
       <DeploymentContent>true</DeploymentContent>
     </None>
     <None Include="Viewer_TemporaryKey.pfx" />
