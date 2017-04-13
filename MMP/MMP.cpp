@@ -17,9 +17,20 @@ typedef CGAL::Simple_cartesian<double> Kernel;
 
 class CandidateInterval;
 
+
+struct AccessPoint {
+	Kernel::FT location;
+	bool initialSide;
+};
+
 template <class Refs>
 class MMPHalfedge : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 public:
+	void insertInterval(CandidateInterval& interval, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
+		AccessPoint searchFor = { 0, false };
+		insertInterval(interval, searchFor, addCandidateInterval);
+	}
+
 	void insertInterval(CandidateInterval& interval, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
 		std::ostringstream stream;
 		auto start = opposite()->vertex()->point();
@@ -31,9 +42,12 @@ public:
 		}
 		OutputDebugStringA(stream.str().c_str());
 
-		CandidateInterval::AccessPoint searchFor = {1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next()};
+		AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next() };
+		insertInterval(interval, searchFor, addCandidateInterval);
+	}
 
-		auto searchComparison = [](const CandidateInterval::AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
+	void insertInterval(CandidateInterval& interval, typename AccessPoint searchFor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
+		auto searchComparison = [](const AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
 			if (existing->accessPoint.initialSide && !probe.initialSide)
 				return true;
 			if (!existing->accessPoint.initialSide && probe.initialSide)
@@ -55,7 +69,7 @@ public:
 			return begin;
 		};
 
-		stream = std::ostringstream();
+		std::ostringstream stream;
 		stream << (location == intervals.end()) << std::endl;
 		OutputDebugStringA(stream.str().c_str());
 
@@ -334,11 +348,9 @@ public:
 		// FIXME: Provide some more resilient way to test for frontier points coincident with vertices
 		if (frontierPoint <= lowerExtent) {
 			frontierPoint = lowerExtent;
-			frontierPointIsAtExtent = true;
 		}
 		else if (frontierPoint >= upperExtent) {
 			frontierPoint = upperExtent;
-			frontierPointIsAtExtent = true;
 		}
 
 		accessPoint = calculateAccessPoint();
@@ -376,16 +388,19 @@ public:
 		return calculatePoint(upperExtent);
 	}
 
-	bool getFrontierPointIsAtExtent() const {
-		return frontierPointIsAtExtent;
-	}
+	enum class FrontierPointLocation {
+		SourceVertex,
+		DestinationVertex,
+		Interior
+	};
 
-	void setFrontierPointIsAtVertex(bool isAtVertex) {
-		frontierPointIsAtVertex = isAtVertex;
-	}
-
-	bool getFrontierPointIsAtVertex() const {
-		return frontierPointIsAtVertex;
+	FrontierPointLocation getFrontierPointLocation() const {
+		// FIXME: Do some sort of rounding.
+		if (frontierPoint == 0)
+			return FrontierPointLocation::SourceVertex;
+		if (frontierPoint == 1)
+			return FrontierPointLocation::DestinationVertex;
+		return FrontierPointLocation::Interior;
 	}
 
 	bool isDeleted() const {
@@ -399,11 +414,6 @@ public:
 private:
 	template <class Refs>
 	friend class MMPHalfedge;
-
-	struct AccessPoint {
-		Kernel::FT location;
-		bool initialSide;
-	};
 
 	static Kernel::FT projectionScalar(Polyhedron::Halfedge_handle halfedge, Polyhedron::Point point) {
 		auto source = halfedge->opposite()->vertex()->point();
@@ -453,8 +463,6 @@ private:
 	Kernel::FT lowerExtent; // 0 <= lowerExtent <= frontierPoint <= upperExtent <= 1
 	Kernel::FT upperExtent;
 	Kernel::FT frontierPoint;
-	bool frontierPointIsAtExtent {false};
-	bool frontierPointIsAtVertex {false};
 	bool deleted {false};
 };
 
@@ -776,19 +784,46 @@ private:
 	}
 
 	void propagate(const CandidateInterval& interval) {
-		if (interval.getFrontierPointIsAtVertex()) {
-			// FIXME: Find the vertex, then find opposite edges which are greater than 2*pi, then insertInteval()
+		auto insertCandidateInterval = [&](CandidateInterval candidateInterval) {
+			auto result = candidateIntervals.insert(candidateIntervals.end(), candidateInterval);
+			eventQueue.place(FrontierPointEvent(result));
+			return result;
+		};
+		auto insertSaddlePointIntervals = [&](Polyhedron::Vertex_handle vertex) {
+			auto circulator = vertex->vertex_begin();
+			do {
+				Polyhedron::Halfedge_handle halfedge;
+				halfedge = circulator->next();
+				halfedge = halfedge->next();
+				// FIXME: Remove this conditional
+				if (circulator->vertex() == vertex) {
+					halfedge = halfedge->next();
+				}
+				// FIXME: halfedge may be wrong.
+				auto depth = interval.getDepth() + std::sqrt((interval.getUnfoldedRoot() - vertex->point()).squared_length());
+				CandidateInterval candidateInterval(halfedge, vertex->point(), depth, 0, 1);
+				halfedge->insertInterval(candidateInterval, insertCandidateInterval);
+				circulator++;
+			} while (circulator != vertex->vertex_begin());
+		};
+
+		switch (interval.getFrontierPointLocation()) {
+		case CandidateInterval::FrontierPointLocation::SourceVertex: {
+			auto& vertex = interval.getHalfedge()->opposite()->vertex();
+			insertSaddlePointIntervals(vertex);
+			break;
 		}
-		else {
+		case CandidateInterval::FrontierPointLocation::DestinationVertex: {
+			auto& vertex = interval.getHalfedge()->vertex();
+			insertSaddlePointIntervals(vertex);
+			break;
+		}
+		case CandidateInterval::FrontierPointLocation::Interior:
 			auto projected = project(interval);
 
 			for (auto& candidateInterval : projected) {
 				if (candidateInterval) {
-					candidateInterval->getHalfedge()->insertInterval(*candidateInterval, interval, [&](CandidateInterval candidateInterval) {
-						auto result = candidateIntervals.insert(candidateIntervals.end(), candidateInterval);
-						eventQueue.place(FrontierPointEvent(result));
-						return result;
-					});
+					candidateInterval->getHalfedge()->insertInterval(*candidateInterval, interval, insertCandidateInterval);
 				}
 			}
 		}
