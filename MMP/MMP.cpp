@@ -792,14 +792,9 @@ private:
 		auto insertSaddlePointIntervals = [&](Polyhedron::Vertex_handle vertex) {
 			auto circulator = vertex->vertex_begin();
 			do {
-				Polyhedron::Halfedge_handle halfedge;
-				halfedge = circulator->next();
-				halfedge = halfedge->next();
-				// FIXME: Remove this conditional
-				if (circulator->vertex() == vertex) {
-					halfedge = halfedge->next();
-				}
-				// FIXME: halfedge may be wrong.
+				assert(circulator->vertex() == vertex);
+				Polyhedron::Halfedge_handle halfedge = circulator->next()->next();
+				assert(halfedge->vertex() != vertex && halfedge->opposite()->vertex() != vertex);
 				auto depth = interval.getDepth() + std::sqrt((interval.getUnfoldedRoot() - vertex->point()).squared_length());
 				CandidateInterval candidateInterval(halfedge, vertex->point(), depth, 0, 1);
 				halfedge->insertInterval(candidateInterval, insertCandidateInterval);
