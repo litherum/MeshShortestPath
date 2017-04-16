@@ -27,6 +27,7 @@ template <class Refs>
 class MMPHalfedge : public CGAL::HalfedgeDS_halfedge_base<Refs> {
 public:
 	void insertInterval(CandidateInterval& interval, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
+		// FIXME: It's not clear to me that we maintain the invariant that the access channel bounds never cross. Maybe this is why the "> 180deg" clause is in the algorithm?
 		AccessPoint searchFor = { 0, false };
 		insertInterval(interval, searchFor, addCandidateInterval);
 	}
@@ -790,17 +791,25 @@ private:
 			return result;
 		};
 		auto insertSaddlePointIntervals = [&](Polyhedron::Vertex_handle vertex) {
+			auto depth = interval.getDepth() + std::sqrt((interval.getUnfoldedRoot() - vertex->point()).squared_length());
 			auto circulator = vertex->vertex_begin();
 			do {
 				assert(circulator->vertex() == vertex);
 				Polyhedron::Halfedge_handle halfedge = circulator->next()->next();
 				assert(halfedge->vertex() != vertex && halfedge->opposite()->vertex() != vertex);
-				auto depth = interval.getDepth() + std::sqrt((interval.getUnfoldedRoot() - vertex->point()).squared_length());
 				CandidateInterval candidateInterval(halfedge, vertex->point(), depth, 0, 1);
 				halfedge->insertInterval(candidateInterval, insertCandidateInterval);
 				circulator++;
 			} while (circulator != vertex->vertex_begin());
 		};
+
+		auto projected = project(interval);
+
+		for (auto& candidateInterval : projected) {
+			if (candidateInterval) {
+				candidateInterval->getHalfedge()->insertInterval(*candidateInterval, interval, insertCandidateInterval);
+			}
+		}
 
 		switch (interval.getFrontierPointLocation()) {
 		case CandidateInterval::FrontierPointLocation::SourceVertex: {
@@ -814,13 +823,7 @@ private:
 			break;
 		}
 		case CandidateInterval::FrontierPointLocation::Interior:
-			auto projected = project(interval);
-
-			for (auto& candidateInterval : projected) {
-				if (candidateInterval) {
-					candidateInterval->getHalfedge()->insertInterval(*candidateInterval, interval, insertCandidateInterval);
-				}
-			}
+			break;
 		}
 	}
 
