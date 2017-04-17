@@ -6,6 +6,7 @@
 #include <synchapi.h>
 
 #include <sstream>
+#include <cmath>
 
 #include "MMP.h"
 
@@ -130,34 +131,24 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		DX::ThrowIfFailed(d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_deviceResources->GetCommandAllocator(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
         NAME_D3D12_OBJECT(m_commandList);
 
-		MMP::PointHeap pointHeap = {
-			{0, 0, 1},
-			{0, 1, 1},
-			{1, 1, 1},
-			{1, 0, 1},
-			{0, 0, 0},
-			{0, 1, 0},
-			{1, 1, 0},
-			{1, 0, 0}};
-		MMP::TriangleIndices triangles = {
-			// Front
-			{0, 1, 2},
-			{2, 3, 0},
-			// Left
-			{4, 5, 1},
-			{1, 0, 4},
-			// Right
-			{3, 2, 6},
-			{6, 7, 3},
-			// Back
-			{7, 6, 5},
-			{5, 4, 7},
-			// Top
-			{1, 5, 6},
-			{6, 2, 1},
-			// Bottom
-			{4, 0, 3},
-			{3, 7, 4}};
+		MMP::PointHeap pointHeap;
+		pointHeap.push_back({ 0, 0, 0 });
+		pointHeap.push_back({ 0, 0, -20 });
+		size_t circumferencePointCount = 10;
+		assert(circumferencePointCount % 2 == 0);
+		assert(circumferencePointCount > 2);
+		for (size_t i = 0; i < circumferencePointCount; ++i) {
+			auto angle = static_cast<double>(i) / circumferencePointCount * 2 * M_PI;
+			auto amplitude = 1.0 / 4.0;
+			pointHeap.push_back({ std::cos(angle), std::sin(angle), i % 2 == 0 ? amplitude : -amplitude });
+		}
+		MMP::TriangleIndices triangles;
+		for (size_t i = 0; i < circumferencePointCount; ++i) {
+			auto index1 = i + 2;
+			auto index2 = ((i + 1) % circumferencePointCount) + 2;
+			triangles.push_back({ 0, index2, index1 });
+			triangles.push_back({ 1, index1, index2 });
+		}
 
 		MMP mmp(pointHeap, triangles, 0, 1.0 / 3.0, 1.0 / 3.0);
 		mmp.run();

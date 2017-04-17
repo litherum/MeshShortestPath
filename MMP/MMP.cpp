@@ -286,7 +286,51 @@ static bool checkLineLineIntersectionResult(Kernel::FT result, Polyhedron::Point
 	return displacement.squared_length() <= 0.001;
 }
 
+static bool areCoplanar(Polyhedron::Point a, Polyhedron::Point b, Polyhedron::Point c, Polyhedron::Point d) {
+	if (distanceBetweenPoints(a, b) < 0.001 || distanceBetweenPoints(a, c) < 0.001 || distanceBetweenPoints(a, d) < 0.001 || distanceBetweenPoints(b, c) < 0.001 || distanceBetweenPoints(b, d) < 0.001 || distanceBetweenPoints(c, d) < 0.001)
+		return true;
+
+	Kernel::Line_3 line(a, b);
+	auto projected = line.projection(c);
+	auto distance = std::sqrt((projected - c).squared_length());
+	if (distance < 0.001)
+		return true;
+
+	Polyhedron::Plane_3 plane(a, b, c);
+	projected = plane.projection(d);
+	distance = std::sqrt((d - projected).squared_length());
+	return distance < 0.001;
+}
+
 static boost::optional<Kernel::FT> lineLineIntersection(Polyhedron::Point a1, Polyhedron::Point a2, Polyhedron::Point b1, Polyhedron::Point b2) {
+	assert(areCoplanar(a1, a2, b1, b2));
+	assert(areCoplanar(a1, a2, b2, b1));
+	assert(areCoplanar(a1, b1, a2, b2));
+	assert(areCoplanar(a1, b1, b2, a2));
+	assert(areCoplanar(a1, b2, a2, b1));
+	assert(areCoplanar(a1, b2, b1, a2));
+
+	assert(areCoplanar(a2, a1, b1, b2));
+	assert(areCoplanar(a2, a1, b2, b1));
+	assert(areCoplanar(a2, b1, a1, b2));
+	assert(areCoplanar(a2, b1, b2, a1));
+	assert(areCoplanar(a2, b2, a1, b1));
+	assert(areCoplanar(a2, b2, b1, a1));
+
+	assert(areCoplanar(b1, a1, a2, b2));
+	assert(areCoplanar(b1, a1, b2, a2));
+	assert(areCoplanar(b1, a2, a1, b2));
+	assert(areCoplanar(b1, a2, b2, a1));
+	assert(areCoplanar(b1, b2, a1, a2));
+	assert(areCoplanar(b1, b2, a2, a1));
+
+	assert(areCoplanar(b2, a1, a2, b1));
+	assert(areCoplanar(b2, a1, b1, a2));
+	assert(areCoplanar(b2, a2, a1, b1));
+	assert(areCoplanar(b2, a2, b1, a1));
+	assert(areCoplanar(b2, b1, a1, a2));
+	assert(areCoplanar(b2, b1, a2, a1));
+
 	// Calculates the fraction of the distance between a1 and a2 the intersection occurs.
 	auto av = a2 - a1;
 	auto bv = b2 - b1;
@@ -827,7 +871,17 @@ private:
 		}
 	}
 
+	static bool isCoplanar(Polyhedron::Plane_3 plane, Polyhedron::Point point) {
+		auto projected = plane.projection(point);
+		auto distance = std::sqrt((point - projected).squared_length());
+		return distance < 0.001;
+	}
+
 	Polyhedron::Point calculateUnfoldedRoot(Polyhedron::Point oldUnfoldedRoot, Polyhedron::Plane_3 originalPlane, Polyhedron::Plane_3 newPlane, Kernel::Line_3 intersection) const {
+		assert(isCoplanar(originalPlane, oldUnfoldedRoot));
+		assert(isCoplanar(originalPlane, intersection.point()));
+		assert(isCoplanar(newPlane, intersection.point()));
+
 		auto originalNormal = originalPlane.orthogonal_vector();
 		originalNormal = originalNormal / std::sqrt(originalNormal.squared_length());
 
@@ -836,30 +890,39 @@ private:
 
 		auto crossProduct = CGAL::cross_product(originalNormal, newNormal);
 		auto dotProduct = originalNormal * newNormal;
-		if (std::abs(crossProduct.squared_length()) < 0.001) { // Coplanar
-			if (dotProduct > 0)
+		auto crossProductMagnitude = std::sqrt(crossProduct.squared_length());
+		if (std::abs(crossProductMagnitude) < 0.001) { // Coplanar
+			if (dotProduct > 0) {
+				assert(isCoplanar(newPlane, oldUnfoldedRoot));
 				return oldUnfoldedRoot;
+			}
 			else {
 				auto projection = intersection.projection(oldUnfoldedRoot);
 				auto delta = oldUnfoldedRoot - projection;
-				return projection - delta;
+				auto result = projection - delta;
+				assert(isCoplanar(newPlane, result));
+				return result;
 			}
 		}
 		else {
-			auto magnitude = std::sqrt(crossProduct.squared_length());
-			auto axis = crossProduct / magnitude;
-			auto angle = std::asin(magnitude);
-			if (dotProduct < 0)
-				angle = M_PI - angle;
+			auto axis = crossProduct / crossProductMagnitude;
+			//auto angle = std::acos(dotProduct);
 
 			auto projection = intersection.projection(oldUnfoldedRoot);
 			auto translatedUnfoldedRoot = oldUnfoldedRoot - projection;
 
+			Polyhedron::Plane_3 oldOriginPlane(Polyhedron::Point_3(0, 0, 0), originalNormal);
+			assert(isCoplanar(oldOriginPlane, Polyhedron::Point_3(0, 0, 0) + translatedUnfoldedRoot));
 			// Rodrigues' rotation formula
-			auto cosTheta = std::cos(angle);
-			auto rotated = translatedUnfoldedRoot * cosTheta + CGAL::cross_product(axis, translatedUnfoldedRoot) + axis * (axis * translatedUnfoldedRoot) * (1 - cosTheta);
-			auto rotatedTranslatedBack = Kernel::Vector_3(projection.x(), projection.y(), projection.z()) + rotated;
-			return Polyhedron::Point(rotatedTranslatedBack.x(), rotatedTranslatedBack.y(), rotatedTranslatedBack.z());
+			auto sinTheta = crossProductMagnitude; // We pretend the angle is 0 <= theta < pi, and use the orientation of the cross product axis to handle the case otherwise
+			auto cosTheta = dotProduct;
+			auto rotated = translatedUnfoldedRoot * cosTheta + CGAL::cross_product(axis, translatedUnfoldedRoot) * sinTheta + axis * (axis * translatedUnfoldedRoot) * (1 - cosTheta);
+			Polyhedron::Plane_3 newOriginPlane(Polyhedron::Point_3(0, 0, 0), newNormal);
+			assert(isCoplanar(newOriginPlane, Polyhedron::Point_3(0, 0, 0) + rotated));
+			auto rotatedTranslatedBack = projection - Polyhedron::Point_3(0, 0, 0) + rotated;
+			auto result = Polyhedron::Point_3(0, 0, 0) + rotatedTranslatedBack;
+			assert(isCoplanar(newPlane, result));
+			return result;
 		}
 	}
 
