@@ -126,11 +126,11 @@ public:
 		auto insertLocation = intervals.erase(beginDeleting.base(), endDeleting);
 
 		auto trimRightSide = [](const CandidateInterval& interval, Kernel::FT location) {
-			return CandidateInterval(interval.getHalfedge(), interval.getUnfoldedRoot(), interval.getDepth(), interval.lowerExtent, location);
+			return CandidateInterval(interval.getHalfedge(), interval.getUnfoldedRoot(), interval.getDepth(), interval.lowerExtent, location, interval.getIsFromSaddlePoint());
 		};
 
 		auto trimLeftSide = [](const CandidateInterval& interval, Kernel::FT location) {
-			return CandidateInterval(interval.getHalfedge(), interval.getUnfoldedRoot(), interval.getDepth(), location, interval.upperExtent);
+			return CandidateInterval(interval.getHalfedge(), interval.getUnfoldedRoot(), interval.getDepth(), location, interval.upperExtent, interval.getIsFromSaddlePoint());
 		};
 
 		auto trimLeftNeighbor = [&](std::vector<std::list<CandidateInterval>::iterator>::iterator location) {
@@ -384,7 +384,7 @@ static boost::optional<Kernel::FT> lineLineIntersection(Polyhedron::Point a1, Po
 
 class CandidateInterval {
 public:
-	CandidateInterval(Polyhedron::Halfedge_handle halfedge, Polyhedron::Point unfoldedRoot, Kernel::FT depth, Kernel::FT lowerExtent, Kernel::FT upperExtent) : halfedge(halfedge), unfoldedRoot(unfoldedRoot), depth(depth), lowerExtent(lowerExtent), upperExtent(upperExtent) {
+	CandidateInterval(Polyhedron::Halfedge_handle halfedge, Polyhedron::Point unfoldedRoot, Kernel::FT depth, Kernel::FT lowerExtent, Kernel::FT upperExtent, bool isFromSaddlePoint) : halfedge(halfedge), unfoldedRoot(unfoldedRoot), depth(depth), lowerExtent(lowerExtent), upperExtent(upperExtent), isFromSaddlePoint(isFromSaddlePoint) {
 		assert(lowerExtent <= upperExtent);
 		assert(lowerExtent >= 0);
 		assert(upperExtent <= 1);
@@ -456,6 +456,10 @@ public:
 		deleted = true;
 	}
 
+	bool getIsFromSaddlePoint() const {
+		return isFromSaddlePoint;
+	}
+
 private:
 	template <class Refs>
 	friend class MMPHalfedge;
@@ -509,6 +513,7 @@ private:
 	Kernel::FT upperExtent;
 	Kernel::FT frontierPoint;
 	bool deleted {false};
+	bool isFromSaddlePoint {false};
 };
 
 static std::vector<Kernel::FT> calculateTiePoints(Kernel::FT d1, Kernel::FT r1, Kernel::FT b, Kernel::FT d2, Kernel::FT r2) {
@@ -601,7 +606,7 @@ public:
 	void run() {
 		auto halfedge = startingFacet->halfedge();
 		do {
-			CandidateInterval candidateInterval(halfedge, startingPoint, 0, 0, 1);
+			CandidateInterval candidateInterval(halfedge, startingPoint, 0, 0, 1, true);
 			auto iterator = candidateIntervals.insert(candidateIntervals.end(), candidateInterval);
 			halfedge->insertInitialInterval(iterator);
 			eventQueue.place(FrontierPointEvent(iterator));
@@ -620,37 +625,31 @@ public:
 		std::vector<std::array<std::vector<HalfedgeInterval>, 3>> result(polyhedron.size_of_facets());
 		for (auto facet = polyhedron.facets_begin(); facet != polyhedron.facets_end(); ++facet) {
 			ss << "Encountering triangle " << facet->getIndex() << std::endl;
-			std::array<std::vector<HalfedgeInterval>, 3> edges;
 			auto halfedge = facet->halfedge();
 			do {
 				auto opposite = halfedge->opposite();
 				ss << "Halfedge " << static_cast<int>(halfedge->getIndex()) << " opposite triangle: " << opposite->facet()->getIndex() << " opposite halfedge: " << static_cast<int>(opposite->getIndex()) << " Halfedge coordinates: (" << opposite->vertex()->point().x() << ", " << opposite->vertex()->point().y() << ", " << opposite->vertex()->point().z() << ") (" << halfedge->vertex()->point().x() << ", " << halfedge->vertex()->point().y() << ", " << halfedge->vertex()->point().z() << ")" << std::endl;
-				std::vector<HalfedgeInterval> intervals;
+				std::vector<HalfedgeInterval> oppositeIntervals;
+				std::vector<HalfedgeInterval> halfedgeIntervals;
 				halfedge->iterateIntervals([&](const CandidateInterval& interval) {
 					assert(!interval.isDeleted());
 					auto unfoldedRoot = interval.getUnfoldedRoot();
 					auto lowerExtent = interval.getLowerExtentFraction();
 					auto upperExtent = interval.getUpperExtentFraction();
 					auto newUnfoldedRoot = calculateUnfoldedRoot(interval.getUnfoldedRoot(), halfedge->facet()->plane(), opposite->facet()->plane(), Kernel::Line_3(halfedge->vertex()->point(), opposite->vertex()->point()));
-					intervals.push_back({ { newUnfoldedRoot.x(), newUnfoldedRoot.y(), newUnfoldedRoot.z() }, 1 - upperExtent, 1 - lowerExtent, interval.getDepth() });
+					oppositeIntervals.push_back({ { newUnfoldedRoot.x(), newUnfoldedRoot.y(), newUnfoldedRoot.z() }, 1 - upperExtent, 1 - lowerExtent, interval.getDepth() });
+					if (interval.getIsFromSaddlePoint())
+						halfedgeIntervals.push_back({ { unfoldedRoot.x(), unfoldedRoot.y(), unfoldedRoot.z() }, upperExtent, lowerExtent, interval.getDepth() });
 				});
-				result[opposite->facet()->getIndex()][opposite->getIndex()] = std::move(intervals);
+				auto& oppositeDestination = result[opposite->facet()->getIndex()][opposite->getIndex()];
+				oppositeDestination.insert(oppositeDestination.end(), oppositeIntervals.begin(), oppositeIntervals.end());
+				auto& halfedgeDestination = result[halfedge->facet()->getIndex()][halfedge->getIndex()];
+				halfedgeDestination.insert(halfedgeDestination.end(), halfedgeIntervals.begin(), halfedgeIntervals.end());
 				halfedge = halfedge->next();
 			} while (halfedge != facet->halfedge());
 		}
 		OutputDebugStringA(ss.str().c_str());
-		// The starting facet has no incoming edges, so we have to handle it here.
-		auto halfedge = startingFacet->halfedge();
-		do {
-			std::vector<HalfedgeInterval> intervals;
-			halfedge->iterateIntervals([&](const CandidateInterval& interval) {
-				auto lowerExtent = interval.getLowerExtentFraction();
-				auto upperExtent = interval.getUpperExtentFraction();
-				intervals.push_back({ {startingPoint.x(), startingPoint.y(), startingPoint.z()}, lowerExtent, upperExtent, 0 });
-			});
-			result[startingFacet->getIndex()][halfedge->getIndex()] = std::move(intervals);
-			halfedge = halfedge->next();
-		} while (halfedge != startingFacet->halfedge());
+		
 		return result;
 	}
 
@@ -841,7 +840,7 @@ private:
 				assert(circulator->vertex() == vertex);
 				Polyhedron::Halfedge_handle halfedge = circulator->next()->next();
 				assert(halfedge->vertex() != vertex && halfedge->opposite()->vertex() != vertex);
-				CandidateInterval candidateInterval(halfedge, vertex->point(), depth, 0, 1);
+				CandidateInterval candidateInterval(halfedge, vertex->point(), depth, 0, 1, true);
 				halfedge->insertInterval(candidateInterval, insertCandidateInterval);
 				circulator++;
 			} while (circulator != vertex->vertex_begin());
@@ -997,7 +996,7 @@ private:
 			*lowerScalar = std::min(std::max(*lowerScalar, Kernel::FT(0)), Kernel::FT(1));
 			*upperScalar = std::min(std::max(*upperScalar, Kernel::FT(0)), Kernel::FT(1));
 			if (upperScalar > lowerScalar)
-				return CandidateInterval(halfedge, newUnfoldedRoot, interval.getDepth(), *lowerScalar, *upperScalar);
+				return CandidateInterval(halfedge, newUnfoldedRoot, interval.getDepth(), *lowerScalar, *upperScalar, false);
 			else
 				return boost::none;
 		};

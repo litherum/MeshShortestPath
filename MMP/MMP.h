@@ -28,7 +28,8 @@ public:
 
 	struct HalfedgeInterval {
 		std::array<double, 3> unfoldedRoot;
-		double beginpointFraction; // FIXME: Remove this when we are guaranteed to have a covering.
+		// Because of saddle points, multiple intervals may overlap.
+		double beginpointFraction;
 		double endpointFraction;
 		double depth;
 	};

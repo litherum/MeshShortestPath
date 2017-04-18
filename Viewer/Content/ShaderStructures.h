@@ -18,6 +18,8 @@ namespace Viewer
 		DirectX::XMFLOAT4 data1;
 		DirectX::XMFLOAT4 data2;
 		DirectX::XMFLOAT4 data3;
-		DirectX::XMFLOAT3 data4;
+		DirectX::XMFLOAT4 data4;
+		DirectX::XMFLOAT4 data5;
+		float data6;
 	};
 }
