@@ -19,7 +19,7 @@ namespace Viewer
 		void SaveState();
 
 		void StartTracking();
-		void TrackingUpdate(float positionX);
+		void TrackingUpdate(float deltaAngle);
 		void StopTracking();
 		bool IsTracking() { return m_tracking; }
 

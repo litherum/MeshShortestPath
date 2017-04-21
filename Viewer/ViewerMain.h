@@ -20,6 +20,10 @@ namespace Viewer
 		void OnResuming();
 		void OnDeviceRemoved();
 
+		void OnPointerActionBegin();
+		void OnPointerActionEnd();
+		void OnPointerActionMove(float delta);
+
 	private:
 		// TODO: Replace with your own content renderers.
 		std::unique_ptr<Sample3DSceneRenderer> m_sceneRenderer;

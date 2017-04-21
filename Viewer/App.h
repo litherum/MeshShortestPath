@@ -29,6 +29,9 @@ namespace Viewer
 		void OnWindowSizeChanged(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::WindowSizeChangedEventArgs^ args);
 		void OnVisibilityChanged(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::VisibilityChangedEventArgs^ args);
 		void OnWindowClosed(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::CoreWindowEventArgs^ args);
+		void OnPointerActionBegin(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::PointerEventArgs^ args);
+		void OnPointerActionEnd(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::PointerEventArgs^ args);
+		void OnPointerActionMove(Windows::UI::Core::CoreWindow^ sender, Windows::UI::Core::PointerEventArgs^ args);
 
 		// DisplayInformation event handlers.
 		void OnDpiChanged(Windows::Graphics::Display::DisplayInformation^ sender, Platform::Object^ args);
@@ -41,6 +44,8 @@ namespace Viewer
 
 		std::shared_ptr<DX::DeviceResources> m_deviceResources;
 		std::unique_ptr<ViewerMain> m_main;
+		Windows::Foundation::EventRegistrationToken m_moveHandlerRegistrationToken;
+		float m_currentPointerPosition;
 		bool m_windowClosed;
 		bool m_windowVisible;
 	};

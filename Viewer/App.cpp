@@ -66,6 +66,18 @@ void App::SetWindow(CoreWindow^ window)
 	window->Closed += 
 		ref new TypedEventHandler<CoreWindow^, CoreWindowEventArgs^>(this, &App::OnWindowClosed);
 
+	window->PointerPressed +=
+		ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &App::OnPointerActionBegin);
+
+	window->PointerReleased +=
+		ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &App::OnPointerActionEnd);
+
+	window->PointerExited +=
+		ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &App::OnPointerActionEnd);
+
+	window->PointerCaptureLost +=
+		ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &App::OnPointerActionEnd);
+
 	DisplayInformation^ currentDisplayInformation = DisplayInformation::GetForCurrentView();
 
 	currentDisplayInformation->DpiChanged +=
@@ -174,6 +186,29 @@ void App::OnVisibilityChanged(CoreWindow^ sender, VisibilityChangedEventArgs^ ar
 void App::OnWindowClosed(CoreWindow^ sender, CoreWindowEventArgs^ args)
 {
 	m_windowClosed = true;
+}
+
+void App::OnPointerActionBegin(CoreWindow^ sender, PointerEventArgs^ args)
+{
+	float currentPosition = args->CurrentPoint->Position.X;
+	m_currentPointerPosition = currentPosition;
+	m_main->OnPointerActionBegin();
+	m_moveHandlerRegistrationToken = sender->PointerMoved +=
+		ref new TypedEventHandler<CoreWindow^, PointerEventArgs^>(this, &App::OnPointerActionMove);
+}
+
+void App::OnPointerActionEnd(CoreWindow^ sender, PointerEventArgs^ args)
+{
+	sender->PointerMoved -= m_moveHandlerRegistrationToken;
+	m_main->OnPointerActionEnd();
+}
+
+void App::OnPointerActionMove(CoreWindow^ sender, PointerEventArgs^ args)
+{
+	float currentPosition = args->CurrentPoint->Position.X;
+	float delta = currentPosition - m_currentPointerPosition;
+	m_currentPointerPosition = currentPosition;
+	m_main->OnPointerActionMove(delta);
 }
 
 // DisplayInformation event handlers.

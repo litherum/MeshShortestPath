@@ -90,3 +90,18 @@ void ViewerMain::OnDeviceRemoved()
 	m_sceneRenderer->SaveState();
 	m_sceneRenderer = nullptr;
 }
+
+void ViewerMain::OnPointerActionBegin()
+{
+	m_sceneRenderer->StartTracking();
+}
+
+void ViewerMain::OnPointerActionEnd()
+{
+	m_sceneRenderer->StopTracking();
+}
+
+void ViewerMain::OnPointerActionMove(float delta)
+{
+	m_sceneRenderer->TrackingUpdate(delta / 200);
+}

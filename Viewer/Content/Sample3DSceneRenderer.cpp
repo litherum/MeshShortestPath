@@ -510,12 +510,12 @@ void Sample3DSceneRenderer::StartTracking()
 }
 
 // When tracking, the 3D cube can be rotated around its Y axis by tracking pointer position relative to the output screen width.
-void Sample3DSceneRenderer::TrackingUpdate(float positionX)
+void Sample3DSceneRenderer::TrackingUpdate(float deltaAngle)
 {
 	if (m_tracking)
 	{
-		float radians = XM_2PI * 2.0f * positionX / m_deviceResources->GetOutputSize().Width;
-		Rotate(radians);
+		m_angle += deltaAngle;
+		Rotate(m_angle);
 	}
 }
 
