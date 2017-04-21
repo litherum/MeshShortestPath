@@ -74,8 +74,23 @@ public:
 		stream << (location == intervals.end()) << std::endl;
 		OutputDebugStringA(stream.str().c_str());
 
-		auto beginDeleting = findEndOfDominatedIntervals(std::make_reverse_iterator(location), intervals.rend(), &CandidateInterval::getLowerExtent);
-		auto endDeleting = findEndOfDominatedIntervals(location, intervals.end(), &CandidateInterval::getUpperExtent);
+		auto beforeSide = std::make_reverse_iterator(location);
+		auto afterSide = location;
+
+		// Maybe? Perhaps I should be comparing the access points and the predecessor's frontier point.
+		if (beforeSide != intervals.rend()) {
+			if (std::abs((*beforeSide)->frontierPoint - interval.frontierPoint) < 0.001) {
+				OutputDebugStringA("broken");
+			}
+		}
+		if (afterSide != intervals.end()) {
+			if (std::abs((*afterSide)->frontierPoint - interval.frontierPoint) < 0.001) {
+				OutputDebugStringA("broken");
+			}
+		}
+
+		auto beginDeleting = findEndOfDominatedIntervals(beforeSide, intervals.rend(), &CandidateInterval::getLowerExtent);
+		auto endDeleting = findEndOfDominatedIntervals(afterSide, intervals.end(), &CandidateInterval::getUpperExtent);
 		// These are pointing to the furthest item which should NOT be deleted.
 		// Calling base() on beginDeleting will make it point to the first item which SHOULD be deleted. (Or equal to endDeleting.)
 

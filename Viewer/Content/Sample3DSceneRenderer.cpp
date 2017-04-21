@@ -136,7 +136,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		MMP::PointHeap pointHeap;
 		pointHeap.push_back({ 0, 0, 0 });
 		pointHeap.push_back({ 0, 0, -3 });
-		size_t circumferencePointCount = 30;
+		size_t circumferencePointCount = 8;
 		assert(circumferencePointCount % 2 == 0);
 		assert(circumferencePointCount > 2);
 		for (size_t i = 0; i < circumferencePointCount; ++i) {
@@ -151,6 +151,35 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			triangles.push_back({ 0, index2, index1 });
 			triangles.push_back({ 1, index1, index2 });
 		}
+		/*
+		MMP::PointHeap pointHeap = {
+			{ 0, 0, 1 },
+			{ 0, 1, 1 },
+			{ 1, 1, 1 },
+			{ 1, 0, 1 },
+			{ 0, 0, 0 },
+			{ 0, 1, 0 },
+			{ 1, 1, 0 },
+			{ 1, 0, 0 } };
+		MMP::TriangleIndices triangles = {
+			// Front
+			{ 0, 1, 2 },
+			{ 2, 3, 0 },
+			// Left
+			{ 4, 5, 1 },
+			{ 1, 0, 4 },
+			// Right
+			{ 3, 2, 6 },
+			{ 6, 7, 3 },
+			// Back
+			{ 7, 6, 5 },
+			{ 5, 4, 7 },
+			// Top
+			{ 1, 5, 6 },
+			{ 6, 2, 1 },
+			// Bottom
+			{ 4, 0, 3 },
+			{ 3, 7, 4 } };*/
 
 		MMP mmp(pointHeap, triangles, 0, 1.0 / 3.0, 1.0 / 3.0);
 		mmp.run();
@@ -408,7 +437,7 @@ void Sample3DSceneRenderer::CreateWindowSizeDependentResources()
 		);
 
 	// Eye is at (0,0.7,1.5), looking at point (0,-0.1,0) with the up-vector along the y-axis.
-	static const XMVECTORF32 eye = { 0.0f, 0.0f, 3.f, 0.0f };
+	static const XMVECTORF32 eye = { 0.0f, 1.4f, 3.f, 0.0f };
 	static const XMVECTORF32 at = { 0.0f, -0.1f, 0.0f, 0.0f };
 	static const XMVECTORF32 up = { 0.0f, 1.0f, 0.0f, 0.0f };
 
