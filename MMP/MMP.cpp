@@ -77,12 +77,12 @@ public:
 		// Maybe? Perhaps I should be comparing the access points and the predecessor's frontier point.
 		if (beforeSide != intervals.rend()) {
 			if (std::abs((*beforeSide)->frontierPoint - interval.frontierPoint) < 0.001) {
-				OutputDebugStringA("broken");
+				ss << "broken" << std::endl;
 			}
 		}
 		if (afterSide != intervals.end()) {
 			if (std::abs((*afterSide)->frontierPoint - interval.frontierPoint) < 0.001) {
-				OutputDebugStringA("broken");
+				ss << "broken" << std::endl;
 			}
 		}
 
@@ -499,7 +499,10 @@ public:
 		auto source = halfedge->opposite()->vertex()->point();
 		auto dest = halfedge->vertex()->point();
 		ss << "[(" << source.x() << ", " << source.y() << ", " << source.z() << ")";
-		ss << " -> (" << dest.x() << ", " << dest.y() << ", " << dest.z() << ") From " << lowerExtent << " to " << upperExtent << "]";
+		ss << " -> (" << dest.x() << ", " << dest.y() << ", " << dest.z() << ")";
+		ss << " From " << lowerExtent << " to " << upperExtent;
+		ss << " Unfolded root (" << unfoldedRoot.x() << ", " << unfoldedRoot.y() << ", " << unfoldedRoot.z() << ")";
+		ss << " Frontier point: " << frontierPoint << "]";
 	}
 
 private:
@@ -937,19 +940,27 @@ private:
 		if (std::abs(crossProductMagnitude) < 0.001) { // Coplanar
 			if (dotProduct > 0) {
 				assert(isCoplanar(newPlane, oldUnfoldedRoot));
+
+				auto oldProjected = intersection.projection(oldUnfoldedRoot);
+				auto newProjected = intersection.projection(oldUnfoldedRoot);
+				assert(distanceBetweenPoints(oldProjected, newProjected) < 0.001);
+				assert(std::abs(distanceBetweenPoints(oldUnfoldedRoot, oldProjected) - distanceBetweenPoints(oldUnfoldedRoot, newProjected)) < 0.001);
 				return oldUnfoldedRoot;
 			}
 			else {
-				auto projection = intersection.projection(oldUnfoldedRoot);
-				auto delta = oldUnfoldedRoot - projection;
-				auto result = projection - delta;
+				auto oldProjected = intersection.projection(oldUnfoldedRoot);
+				auto delta = oldUnfoldedRoot - oldProjected;
+				auto result = oldProjected - delta;
 				assert(isCoplanar(newPlane, result));
+
+				auto newProjected = intersection.projection(result);
+				assert(distanceBetweenPoints(oldProjected, newProjected) < 0.001);
+				assert(std::abs(distanceBetweenPoints(oldUnfoldedRoot, oldProjected) - distanceBetweenPoints(result, newProjected)) < 0.001);
 				return result;
 			}
 		}
 		else {
 			auto axis = crossProduct / crossProductMagnitude;
-			//auto angle = std::acos(dotProduct);
 
 			auto projection = intersection.projection(oldUnfoldedRoot);
 			auto translatedUnfoldedRoot = oldUnfoldedRoot - projection;
@@ -965,6 +976,11 @@ private:
 			auto rotatedTranslatedBack = projection - Polyhedron::Point_3(0, 0, 0) + rotated;
 			auto result = Polyhedron::Point_3(0, 0, 0) + rotatedTranslatedBack;
 			assert(isCoplanar(newPlane, result));
+
+			auto oldProjected = intersection.projection(oldUnfoldedRoot);
+			auto newProjected = intersection.projection(result);
+			assert(distanceBetweenPoints(oldProjected, newProjected) < 0.001);
+			assert(std::abs(distanceBetweenPoints(oldUnfoldedRoot, oldProjected) - distanceBetweenPoints(result, newProjected)) < 0.001);
 			return result;
 		}
 	}
