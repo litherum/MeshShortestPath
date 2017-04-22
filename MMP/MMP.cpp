@@ -33,21 +33,21 @@ public:
 	}
 
 	void insertInterval(CandidateInterval& interval, const CandidateInterval& predecessor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
-		std::ostringstream stream;
-		auto start = opposite()->vertex()->point();
-		auto end = vertex()->point();
-		stream << "Inserting into halfedge (" << start.x() << ", " << start.y() << ", " << start.z() << ") -> (" << end.x() << ", " << end.y() << ", " << end.z() << ")" << std::endl;
-		stream << "Predecessor info: " << predecessor.frontierPoint << " " << (predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next()) << std::endl;
-		for (auto& interval : intervals) {
-			stream << "Interval: " << interval->getLowerExtentFraction() << " - " << interval->getUpperExtentFraction() << " Frontier Point: " << interval->frontierPoint << std::endl;
-		}
-		OutputDebugStringA(stream.str().c_str());
-
 		AccessPoint searchFor = { 1 - predecessor.frontierPoint, predecessor.getHalfedge()->opposite() == interval.getHalfedge()->next() };
 		insertInterval(interval, searchFor, addCandidateInterval);
 	}
 
 	void insertInterval(CandidateInterval& interval, typename AccessPoint searchFor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
+		std::ostringstream ss;
+		ss << "Inserting interval ";
+		interval.output(ss);
+		ss << " into list:" << std::endl << "{";
+		for (auto& interval : intervals) {
+			interval->output(ss);
+			ss << " ";
+		}
+		ss << "}" << std::endl;
+
 		auto searchComparison = [](const AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
 			if (existing->accessPoint.initialSide && !probe.initialSide)
 				return true;
@@ -57,6 +57,7 @@ public:
 		};
 
 		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
+		ss << "Starting search location: Index " << location - intervals.begin() << std::endl;
 
 		auto findEndOfDominatedIntervals = [&](auto begin, auto end, Polyhedron::Point(CandidateInterval::*extentFunction)() const) {
 			while (begin != end) {
@@ -69,10 +70,6 @@ public:
 			}
 			return begin;
 		};
-
-		std::ostringstream stream;
-		stream << (location == intervals.end()) << std::endl;
-		OutputDebugStringA(stream.str().c_str());
 
 		auto beforeSide = std::make_reverse_iterator(location);
 		auto afterSide = location;
@@ -93,6 +90,8 @@ public:
 		auto endDeleting = findEndOfDominatedIntervals(afterSide, intervals.end(), &CandidateInterval::getUpperExtent);
 		// These are pointing to the furthest item which should NOT be deleted.
 		// Calling base() on beginDeleting will make it point to the first item which SHOULD be deleted. (Or equal to endDeleting.)
+
+		ss << "Found dominated intervals starting just before index " << (beginDeleting.base() - intervals.begin()) << " and ending just before index " << (endDeleting - intervals.begin()) << std::endl;
 
 		// "Left and "right" are in reference to a halfedge which points to the right. (--------->)
 		boost::optional<Kernel::FT> leftTrimPoint;
@@ -116,21 +115,42 @@ public:
 		if (beginDeleting != intervals.rend()) {
 			if (auto trimPoint = calculateTrimPoints(**beginDeleting, interval))
 				leftTrimPoint = trimPoint;
-			else
+			else {
+				ss << "I'm completely dominated by the begin deleting side. Doing nothing and returning early." << std::endl;
+				OutputDebugStringA(ss.str().c_str());
 				return;
+			}
 		}
 
 		if (endDeleting != intervals.end()) {
 			if (auto trimPoint = calculateTrimPoints(interval, **endDeleting))
 				rightTrimPoint = trimPoint;
-			else
+			else {
+				ss << "I'm completely dominated by the end deleting side. Doing nothing and returning early." << std::endl;
+				OutputDebugStringA(ss.str().c_str());
 				return;
+			}
 		}
 
-		if (leftTrimPoint && rightTrimPoint && *leftTrimPoint > *rightTrimPoint)
+		if (leftTrimPoint && rightTrimPoint && *leftTrimPoint > *rightTrimPoint) {
+			ss << "The left trim point is to the right of the right trim point. Doing nothing and returning early." << std::endl;
+			OutputDebugStringA(ss.str().c_str());
 			return;
+		}
 
 		// Ready to go! Let's start modifying things.
+		ss << "Ready to go! Left trim point is ";
+		if (leftTrimPoint)
+			ss << *leftTrimPoint;
+		else
+			ss << "null";
+		ss << ". Right trim point is ";
+		if (rightTrimPoint)
+			ss << *rightTrimPoint;
+		else
+			ss << "null";
+		ss << "." << std::endl;
+		OutputDebugStringA(ss.str().c_str());
 
 		// The event queue has iterators into the candidateIntervals list, so we can't simply delete them without updating the event queue.
 		std::for_each(beginDeleting.base(), endDeleting, [](auto candidateInterval) {
@@ -475,6 +495,13 @@ public:
 		return isFromSaddlePoint;
 	}
 
+	void output(std::ostringstream& ss) const {
+		auto source = halfedge->opposite()->vertex()->point();
+		auto dest = halfedge->vertex()->point();
+		ss << "[(" << source.x() << ", " << source.y() << ", " << source.z() << ")";
+		ss << " -> (" << dest.x() << ", " << dest.y() << ", " << dest.z() << ") From " << lowerExtent << " to " << upperExtent << "]";
+	}
+
 private:
 	template <class Refs>
 	friend class MMPHalfedge;
@@ -637,6 +664,7 @@ public:
 
 	std::vector<std::array<std::vector<HalfedgeInterval>, 3>> intervals() const {
 		std::ostringstream ss;
+		ss << "Emitting triangles" << std::endl;
 		std::vector<std::array<std::vector<HalfedgeInterval>, 3>> result(polyhedron.size_of_facets());
 		for (auto facet = polyhedron.facets_begin(); facet != polyhedron.facets_end(); ++facet) {
 			ss << "Encountering triangle " << facet->getIndex() << std::endl;
@@ -812,12 +840,9 @@ private:
 			}
 
 			std::ostringstream stream;
-			auto source = event.getCandidateInterval()->getHalfedge()->opposite()->vertex()->point();
-			auto dest = event.getCandidateInterval()->getHalfedge()->vertex()->point();
-			auto l = event.getCandidateInterval()->getLowerExtentFraction();
-			auto r = event.getCandidateInterval()->getUpperExtentFraction();
-			stream << "Encountering candidate interval (" << source.x() << ", " << source.y() << ", " << source.z() << ")";
-			stream << " -> (" << dest.x() << ", " << dest.y() << ", " << dest.z() << ") " << l << " " << r << std::endl;
+			stream << "Visiting ";
+			event.getCandidateInterval()->output(stream);
+			stream << std::endl;
 			OutputDebugStringA(stream.str().c_str());
 
 			// FIXME: Possibly label the event
@@ -864,18 +889,22 @@ private:
 		auto projected = project(interval);
 
 		for (auto& candidateInterval : projected) {
-			if (candidateInterval) {
-				candidateInterval->getHalfedge()->insertInterval(*candidateInterval, interval, insertCandidateInterval);
-			}
+			candidateInterval.getHalfedge()->insertInterval(candidateInterval, interval, insertCandidateInterval);
 		}
 
 		switch (interval.getFrontierPointLocation()) {
 		case CandidateInterval::FrontierPointLocation::SourceVertex: {
+			std::ostringstream ss;
+			ss << "Frontier point is at the source vertex." << std::endl;
+			OutputDebugStringA(ss.str().c_str());
 			auto& vertex = interval.getHalfedge()->opposite()->vertex();
 			insertSaddlePointIntervals(vertex);
 			break;
 		}
 		case CandidateInterval::FrontierPointLocation::DestinationVertex: {
+			std::ostringstream ss;
+			ss << "Frontier point is at the destination vertex." << std::endl;
+			OutputDebugStringA(ss.str().c_str());
 			auto& vertex = interval.getHalfedge()->vertex();
 			insertSaddlePointIntervals(vertex);
 			break;
@@ -980,12 +1009,18 @@ private:
 			return t;
 	}
 
-	std::array<boost::optional<CandidateInterval>, 2> project(const CandidateInterval& interval) {
+	std::vector<CandidateInterval> project(const CandidateInterval& interval) {
 		auto halfedge = interval.getHalfedge();
 		auto opposite = halfedge->opposite();
 		auto next = opposite->next();
 		auto nextnext = next->next();
 		assert(nextnext->next() == opposite);
+
+		std::ostringstream ss;
+		ss << "Projecting interval predecessor ";
+		interval.output(ss);
+		ss << std::endl;
+		OutputDebugStringA(ss.str().c_str());
 
 		auto newUnfoldedRoot = calculateUnfoldedRoot(interval.getUnfoldedRoot(), halfedge->facet()->plane(), opposite->facet()->plane(), Kernel::Line_3(halfedge->vertex()->point(), opposite->vertex()->point()));
 
@@ -1015,7 +1050,24 @@ private:
 			else
 				return boost::none;
 		};
-		return {project(next), project(nextnext)};
+		std::vector<CandidateInterval> result;
+		if (auto& projection = project(next)) {
+			std::ostringstream ss;
+			ss << "Result on side 1: ";
+			projection->output(ss);
+			ss << std::endl;
+			OutputDebugStringA(ss.str().c_str());
+			result.emplace_back(std::move(*projection));
+		}
+		if (auto& projection = project(nextnext)) {
+			std::ostringstream ss;
+			ss << "Result on side 2: ";
+			projection->output(ss);
+			ss << std::endl;
+			OutputDebugStringA(ss.str().c_str());
+			result.emplace_back(std::move(*projection));
+		}
+		return result;
 	}
 
 	Polyhedron polyhedron;
