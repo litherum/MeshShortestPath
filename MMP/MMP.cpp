@@ -840,7 +840,7 @@ private:
 			}
 
 			std::ostringstream stream;
-			stream << "Visiting ";
+			stream << std::endl << "Visiting ";
 			event.getCandidateInterval()->output(stream);
 			stream << std::endl;
 			OutputDebugStringA(stream.str().c_str());
