@@ -61,10 +61,30 @@ public:
 
 		auto findEndOfDominatedIntervals = [&](auto begin, auto end, Polyhedron::Point(CandidateInterval::*extentFunction)() const) {
 			while (begin != end) {
-				if ((*begin)->lowerExtent >= interval.lowerExtent && (*begin)->upperExtent <= interval.upperExtent &&
-					distanceBetweenPoints(((**begin).*extentFunction)(), (*begin)->getUnfoldedRoot()) + (*begin)->getDepth() >=
-					distanceBetweenPoints(((**begin).*extentFunction)(), interval.getUnfoldedRoot()) + interval.getDepth())
-					++begin;
+				if ((*begin)->lowerExtent >= interval.lowerExtent && (*begin)->upperExtent <= interval.upperExtent) {
+					int numSteps = 10;
+					auto source = (*begin)->getHalfedge()->opposite()->vertex()->point();
+					auto destination = (*begin)->getHalfedge()->vertex()->point();
+					auto v = destination - source;
+					for (int i = 0; i <= numSteps; ++i) {
+						auto fraction = static_cast<double>(i) / numSteps * ((*begin)->upperExtent - (*begin)->lowerExtent) + (*begin)->lowerExtent;
+						auto point = source + fraction * v;
+						auto existingDistance = distanceBetweenPoints(point, (*begin)->getUnfoldedRoot()) + (*begin)->getDepth();
+						auto newDistance = distanceBetweenPoints(point, interval.getUnfoldedRoot()) + interval.getDepth();
+						ss << "Point " << i << " existing distance: " << existingDistance << " new distance: " << newDistance << std::endl;
+					}
+					auto beginPoint = (*begin)->getLowerExtent();
+					auto endPoint = (*begin)->getUpperExtent();
+					auto existingUnfoldedRoot = (*begin)->getUnfoldedRoot();
+					auto newUnfoldedRoot = interval.getUnfoldedRoot();
+					auto existingDepth = (*begin)->getDepth();
+					auto newDepth = interval.getDepth();
+					if (distanceBetweenPoints(beginPoint, existingUnfoldedRoot) + existingDepth >= distanceBetweenPoints(beginPoint, newUnfoldedRoot) + newDepth &&
+						distanceBetweenPoints(endPoint, existingUnfoldedRoot) + existingDepth >= distanceBetweenPoints(endPoint, newUnfoldedRoot) + newDepth)
+						++begin;
+					else
+						break;
+				} 
 				else
 					break;
 			}
