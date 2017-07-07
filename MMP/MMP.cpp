@@ -17,7 +17,6 @@ typedef CGAL::Simple_cartesian<double> Kernel;
 
 class CandidateInterval;
 
-
 struct AccessPoint {
 	Kernel::FT location;
 	bool initialSide;
@@ -37,6 +36,12 @@ public:
 		insertInterval(interval, searchFor, addCandidateInterval);
 	}
 
+	static AccessPoint normalizeAccessPoint(AccessPoint accessPoint) {
+		if (accessPoint.initialSide && accessPoint.location == 1)
+			return { false, 0 };
+		return accessPoint;
+	}
+
 	void insertInterval(CandidateInterval& interval, typename AccessPoint searchFor, std::function<std::list<CandidateInterval>::iterator(CandidateInterval)> addCandidateInterval) {
 		std::ostringstream ss;
 		ss << "Inserting interval ";
@@ -48,12 +53,51 @@ public:
 		}
 		ss << "}" << std::endl;
 
-		auto searchComparison = [](const AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
-			if (existing->accessPoint.initialSide && !probe.initialSide)
+		auto searchComparison = [&](const AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
+			auto normalizedProbe = normalizeAccessPoint(probe);
+			auto normalizedExisting = normalizeAccessPoint(existing->accessPoint);
+			if (normalizedExisting.initialSide && !normalizedProbe.initialSide)
 				return true;
-			if (!existing->accessPoint.initialSide && probe.initialSide)
+			if (!normalizedExisting.initialSide && normalizedProbe.initialSide)
 				return false;
-			return existing->accessPoint.location < probe.location;
+			assert(normalizedExisting.initialSide == normalizedProbe.initialSide);
+			if (normalizedExisting.location == normalizedProbe.location) {
+				// The paper doesn't describe what to do in this case.
+				// The access channels shouldn't cross, which means the order of the access points should match the order of the frontier points.
+				if (interval.frontierPoint < existing->frontierPoint)
+					return true;
+				if (interval.frontierPoint > existing->frontierPoint)
+					return false;
+				assert(interval.frontierPoint == existing->frontierPoint);
+
+				assert(normalizedExisting.location == 0 || normalizedExisting.location == 1);
+				auto existingDistance = distanceBetweenPoints(existing->getFrontierPoint(), existing->getUnfoldedRoot()) + existing->getDepth();
+				auto newDistance = distanceBetweenPoints(interval.getFrontierPoint(), interval.getUnfoldedRoot()) + interval.getDepth();
+				if (!normalizedExisting.initialSide && normalizedExisting.location == 1) {
+					// If the distance functions never intersect, we will handle the new interval correctly below no matter where it's inserted.
+					if (newDistance < existingDistance)
+						return true;
+					if (existingDistance < newDistance)
+						return false;
+					assert(false);
+					// FIXME: Figure out what to do if the distance functions intersect at the vertex
+					return false;
+				}
+				if (normalizedExisting.initialSide && normalizedExisting.location == 0) {
+					// If the distance functions never intersect, we will handle the new interval correctly below no matter where it's inserted.
+					if (newDistance < existingDistance)
+						return false;
+					if (existingDistance < newDistance)
+						return true;
+					assert(false);
+					// FIXME: Figure out what to do if the distance functions intersect at the vertex
+					return false;
+				}
+				assert(!normalizedExisting.initialSide && normalizedExisting.location == 0);
+				// Everything is lined up. We will handle the new interval correctly below no matter where it's inserted.
+				return &interval < &(*existing);
+			}
+			return normalizedExisting.location < normalizedProbe.location;
 		};
 
 		auto location = std::upper_bound(intervals.begin(), intervals.end(), searchFor, searchComparison);
