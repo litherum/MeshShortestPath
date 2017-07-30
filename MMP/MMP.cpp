@@ -53,6 +53,18 @@ public:
 		}
 		ss << "}" << std::endl;
 
+		ss << "Within the bounds of the new interval, the distances are:" << std::endl;
+		auto iterator = intervals.begin();
+		int steps = 10;
+		for (int i = 0; i <= steps; ++i) {
+			auto completion = static_cast<Kernel::FT>(i) / steps;
+			auto fraction = interval.getLowerExtentFraction() + (interval.getUpperExtentFraction() - interval.getLowerExtentFraction()) * completion;
+			while (iterator != intervals.end() && (*iterator)->getUpperExtentFraction() < fraction)
+				++iterator;
+			if (iterator != intervals.end() && (*iterator)->getLowerExtentFraction() <= fraction)
+				ss << "Completion: " << completion << " Existing Distance: " << (*iterator)->getDistanceToSource(fraction) << " Candidate Distance: " << interval.getDistanceToSource(fraction) << std::endl;
+		}
+
 		auto searchComparison = [&](const AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
 			auto normalizedProbe = normalizeAccessPoint(probe);
 			auto normalizedExisting = normalizeAccessPoint(existing->accessPoint);
@@ -71,8 +83,8 @@ public:
 				assert(interval.frontierPoint == existing->frontierPoint);
 
 				assert(normalizedExisting.location == 0 || normalizedExisting.location == 1);
-				auto existingDistance = distanceBetweenPoints(existing->getFrontierPoint(), existing->getUnfoldedRoot()) + existing->getDepth();
-				auto newDistance = distanceBetweenPoints(interval.getFrontierPoint(), interval.getUnfoldedRoot()) + interval.getDepth();
+				auto existingDistance = existing->getDistanceToSource();
+				auto newDistance = interval.getDistanceToSource();
 				if (!normalizedExisting.initialSide && normalizedExisting.location == 1) {
 					// If the distance functions never intersect, we will handle the new interval correctly below no matter where it's inserted.
 					if (newDistance < existingDistance)
@@ -106,25 +118,14 @@ public:
 		auto findEndOfDominatedIntervals = [&](auto begin, auto end, Polyhedron::Point(CandidateInterval::*extentFunction)() const) {
 			while (begin != end) {
 				if ((*begin)->lowerExtent >= interval.lowerExtent && (*begin)->upperExtent <= interval.upperExtent) {
-					int numSteps = 10;
-					auto source = (*begin)->getHalfedge()->opposite()->vertex()->point();
-					auto destination = (*begin)->getHalfedge()->vertex()->point();
-					auto v = destination - source;
-					for (int i = 0; i <= numSteps; ++i) {
-						auto fraction = static_cast<double>(i) / numSteps * ((*begin)->upperExtent - (*begin)->lowerExtent) + (*begin)->lowerExtent;
-						auto point = source + fraction * v;
-						auto existingDistance = distanceBetweenPoints(point, (*begin)->getUnfoldedRoot()) + (*begin)->getDepth();
-						auto newDistance = distanceBetweenPoints(point, interval.getUnfoldedRoot()) + interval.getDepth();
-						ss << "Point " << i << " existing distance: " << existingDistance << " new distance: " << newDistance << std::endl;
-					}
 					auto beginPoint = (*begin)->getLowerExtent();
 					auto endPoint = (*begin)->getUpperExtent();
 					auto existingUnfoldedRoot = (*begin)->getUnfoldedRoot();
 					auto newUnfoldedRoot = interval.getUnfoldedRoot();
 					auto existingDepth = (*begin)->getDepth();
 					auto newDepth = interval.getDepth();
-					if (distanceBetweenPoints(beginPoint, existingUnfoldedRoot) + existingDepth >= distanceBetweenPoints(beginPoint, newUnfoldedRoot) + newDepth &&
-						distanceBetweenPoints(endPoint, existingUnfoldedRoot) + existingDepth >= distanceBetweenPoints(endPoint, newUnfoldedRoot) + newDepth)
+					if ((*begin)->getDistanceToSource(beginPoint) >= interval.getDistanceToSource(beginPoint) &&
+						(*begin)->getDistanceToSource(endPoint) >= interval.getDistanceToSource(endPoint))
 						++begin;
 					else
 						break;
@@ -220,7 +221,6 @@ public:
 		std::for_each(beginDeleting.base(), endDeleting, [](auto candidateInterval) {
 			candidateInterval->setDeleted();
 		});
-		bool result = beginDeleting == intervals.rend() || endDeleting == intervals.end();
 
 		auto insertLocation = intervals.erase(beginDeleting.base(), endDeleting);
 
@@ -530,6 +530,18 @@ public:
 
 	Polyhedron::Point getUpperExtent() const {
 		return calculatePoint(upperExtent);
+	}
+
+	Kernel::FT getDistanceToSource(Polyhedron::Point point) const {
+		return distanceBetweenPoints(point, unfoldedRoot) + depth;
+	}
+
+	Kernel::FT getDistanceToSource(Kernel::FT fractionThroughHalfedge) const {
+		return getDistanceToSource(calculatePoint(fractionThroughHalfedge));
+	}
+
+	Kernel::FT getDistanceToSource() const {
+		return getDistanceToSource(frontierPoint);
 	}
 
 	enum class FrontierPointLocation {
@@ -946,9 +958,7 @@ private:
 	};
 
 	static Kernel::FT computeLabel(Polyhedron::Point point, const CandidateInterval& candidateInterval) {
-		auto unfoldedRoot = candidateInterval.getUnfoldedRoot();
-		auto displacement = point - unfoldedRoot;
-		return std::sqrt(displacement.squared_length()) + candidateInterval.getDepth();
+		return candidateInterval.getDistanceToSource(point);
 	}
 
 	void propagate(const CandidateInterval& interval) {
@@ -958,7 +968,7 @@ private:
 			return result;
 		};
 		auto insertSaddlePointIntervals = [&](Polyhedron::Vertex_handle vertex) {
-			auto depth = interval.getDepth() + std::sqrt((interval.getUnfoldedRoot() - vertex->point()).squared_length());
+			auto depth = interval.getDistanceToSource(vertex->point());
 			auto circulator = vertex->vertex_begin();
 			do {
 				assert(circulator->vertex() == vertex);
