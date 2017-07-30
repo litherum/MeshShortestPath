@@ -566,7 +566,8 @@ public:
 		ss << " -> (" << dest.x() << ", " << dest.y() << ", " << dest.z() << ")";
 		ss << " From " << lowerExtent << " to " << upperExtent;
 		ss << " Unfolded root (" << unfoldedRoot.x() << ", " << unfoldedRoot.y() << ", " << unfoldedRoot.z() << ")";
-		ss << " Frontier point: " << frontierPoint << "]";
+		ss << " Frontier point: " << frontierPoint;
+		ss << " Access point: " << (accessPoint.initialSide ? "Initial Side " : "Secondary side ") << accessPoint.location << "]";
 	}
 
 private:
