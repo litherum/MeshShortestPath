@@ -583,18 +583,16 @@ private:
 
 	AccessPoint calculateAccessPoint() const {
 		if (frontierPoint < 0.001) {
-			auto fraction = lineLineIntersection(halfedge->vertex()->point(), halfedge->next()->vertex()->point(), unfoldedRoot, halfedge->opposite()->vertex()->point);
-			assert(!fraction || *fraction >= 0);
-			if (!fraction || *fraction > 1)
+			auto fraction = lineLineIntersection(halfedge->vertex()->point(), halfedge->next()->vertex()->point(), unfoldedRoot, halfedge->opposite()->vertex()->point());
+			if (!fraction || *fraction < 0 || *fraction > 1)
 				return { 1, false };
 			else
 				return { *fraction, true };
 		}
 
 		if (frontierPoint > 1 - 0.001) {
-			auto fraction = lineLineIntersection(halfedge->next()->vertex()->point(), halfedge->next()->next()->vertex()->point(), unfoldedRoot, getFrontierPoint());
-			assert(!fraction || *fraction <= 1);
-			if (!fraction || *fraction < 0)
+			auto fraction = lineLineIntersection(halfedge->next()->vertex()->point(), halfedge->next()->next()->vertex()->point(), unfoldedRoot, halfedge->vertex()->point());
+			if (!fraction || *fraction < 0 || *fraction > 1)
 				return { 0, true };
 			else
 				return { *fraction, false };
