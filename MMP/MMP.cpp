@@ -654,7 +654,7 @@ static std::vector<Kernel::FT> calculateTiePoints(Kernel::FT d1, Kernel::FT r1, 
 	if (d == 0) {
 		// sqrt(ra + b1^2) = sqrt(rb + (b - b1)^2)
 		// ra + b1^2 = rb + (b - b1)^2
-		// ra + b1^2 = rb + b^2 - 2*b*b1 * b1^2
+		// ra + b1^2 = rb + b^2 - 2*b*b1 + b1^2
 		// ra = rb + b^2 - 2*b*b1
 		// b1 * 2b = rb + b^2 - ra
 		assert(b != 0);
@@ -694,6 +694,8 @@ static std::vector<Kernel::FT> calculateTiePoints(const CandidateInterval& a, co
 	auto projectionScalarB = projectionScalar(halfedge, b.getUnfoldedRoot());
 	auto closestApproachB = source + projectionScalarB * vector;
 	auto distance = distanceBetweenPoints(closestApproachA, closestApproachB);
+	if (projectionScalarA > projectionScalarB)
+		distance *= -1;
 	auto d2 = b.getDepth();
 	auto r2 = distanceBetweenPoints(b.getUnfoldedRoot(), closestApproachB);
 
