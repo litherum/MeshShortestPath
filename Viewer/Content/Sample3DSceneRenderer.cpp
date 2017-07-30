@@ -144,6 +144,19 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 			auto amplitude = 1.0 / 4.0;
 			pointHeap.push_back({ std::cos(angle), std::sin(angle), i % 2 == 0 ? amplitude : -amplitude });
 		}
+
+		std::ostringstream ss;
+		auto computeDistance = [](std::array<double, 3> a, std::array<double, 3> b) -> double {
+			auto dx = a[0] - b[0];
+			auto dy = a[1] - b[1];
+			auto dz = a[2] - b[2];
+			return std::sqrt(dx * dx + dy * dy + dz * dz);
+		};
+		ss << "Radial Length: " << computeDistance(pointHeap[0], pointHeap[2]) << std::endl;
+		ss << "Circumference Length: " << computeDistance(pointHeap[2], pointHeap[3]) << std::endl;
+		ss << "Long Length: " << computeDistance(pointHeap[1], pointHeap[2]) << std::endl;
+		ss << "Long Length 2: " << computeDistance(pointHeap[1], pointHeap[3]) << std::endl;
+		OutputDebugStringA(ss.str().c_str());
 		MMP::TriangleIndices triangles;
 		for (size_t i = 0; i < circumferencePointCount; ++i) {
 			auto index1 = i + 2;
