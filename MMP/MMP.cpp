@@ -62,8 +62,9 @@ public:
 			while (iterator != intervals.end() && (*iterator)->getUpperExtentFraction() < fraction)
 				++iterator;
 			if (iterator != intervals.end() && (*iterator)->getLowerExtentFraction() <= fraction)
-				ss << "Completion: " << completion << " Existing Distance: " << (*iterator)->getDistanceToSource(fraction) << " Candidate Distance: " << interval.getDistanceToSource(fraction) << std::endl;
+				ss << "Completion: " << completion << " Existing Halfedge index: " << (iterator - intervals.begin()) << " Distance: " << (*iterator)->getDistanceToSource(fraction) << " Candidate Distance: " << interval.getDistanceToSource(fraction) << std::endl;
 		}
+		ss << "Done dumping distances." << std::endl;
 
 		auto searchComparison = [&](const AccessPoint probe, const std::list<CandidateInterval>::iterator& existing) {
 			auto normalizedProbe = normalizeAccessPoint(probe);
@@ -138,18 +139,6 @@ public:
 
 		auto beforeSide = std::make_reverse_iterator(location);
 		auto afterSide = location;
-
-		// Maybe? Perhaps I should be comparing the access points and the predecessor's frontier point.
-		if (beforeSide != intervals.rend()) {
-			if (std::abs((*beforeSide)->frontierPoint - interval.frontierPoint) < 0.001) {
-				ss << "broken" << std::endl;
-			}
-		}
-		if (afterSide != intervals.end()) {
-			if (std::abs((*afterSide)->frontierPoint - interval.frontierPoint) < 0.001) {
-				ss << "broken" << std::endl;
-			}
-		}
 
 		auto beginDeleting = findEndOfDominatedIntervals(beforeSide, intervals.rend(), &CandidateInterval::getLowerExtent);
 		auto endDeleting = findEndOfDominatedIntervals(afterSide, intervals.end(), &CandidateInterval::getUpperExtent);
