@@ -652,13 +652,28 @@ static std::vector<Kernel::FT> calculateTiePoints(Kernel::FT d1, Kernel::FT r1, 
 	// d + sqrt(ra + b1^2) = sqrt(rb + (b - b1)^2)
 
 	if (d == 0) {
+		if (b == 0) {
+			assert(std::abs(r1 - r2) < 0.001);
+			return {0};
+		}
+
 		// sqrt(ra + b1^2) = sqrt(rb + (b - b1)^2)
 		// ra + b1^2 = rb + (b - b1)^2
 		// ra + b1^2 = rb + b^2 - 2*b*b1 + b1^2
 		// ra = rb + b^2 - 2*b*b1
 		// b1 * 2b = rb + b^2 - ra
-		assert(b != 0);
 		return {(rb + b * b - ra) / (2 * b)};
+	}
+
+	{
+		// Pretend the depth values are linear.
+		auto r = r2 - r1;
+		auto hypotenuse = std::sqrt(r*r + b*b);
+		if (std::abs(d2 - (hypotenuse + d1)) < 0.001 || std::abs(d1 - (hypotenuse + d2)) < 0.001) {
+			// We just have a line. Find its intercept with the X axis.
+			auto slope = r / b;
+			return {-r1 / slope};
+		}
 	}
 
 	// d^2 + 2d * sqrt(ra + b1^2) + ra + b1^2 = rb + (b - b1)^2 // good
