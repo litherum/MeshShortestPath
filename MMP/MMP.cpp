@@ -356,10 +356,10 @@ static Kernel::FT projectionScalar(Polyhedron::Halfedge_handle halfedge, Polyhed
 
 static std::vector<Kernel::FT> quadraticFormula(Kernel::FT a, Kernel::FT b, Kernel::FT c) {
 	auto discriminant = b * b - 4 * a * c;
-	if (discriminant < 0)
-		return {};
-	else if (discriminant == 0) // FIXME: Possibly round a little
+	if (abs(discriminant) < 0.001)
 		return { -b / (2 * a) };
+	else if (discriminant < 0)
+		return {};
 	else {
 		auto discriminantSquareRoot = std::sqrt(discriminant);
 		return {(-b + discriminantSquareRoot) / (2 * a), (-b - discriminantSquareRoot) / (2 * a)};
@@ -663,17 +663,6 @@ static std::vector<Kernel::FT> calculateTiePoints(Kernel::FT d1, Kernel::FT r1, 
 		// ra = rb + b^2 - 2*b*b1
 		// b1 * 2b = rb + b^2 - ra
 		return {(rb + b * b - ra) / (2 * b)};
-	}
-
-	{
-		// Pretend the depth values are linear.
-		auto r = r2 - r1;
-		auto hypotenuse = std::sqrt(r*r + b*b);
-		if (std::abs(d2 - (hypotenuse + d1)) < 0.001 || std::abs(d1 - (hypotenuse + d2)) < 0.001) {
-			// We just have a line. Find its intercept with the X axis.
-			auto slope = r / b;
-			return {-r1 / slope};
-		}
 	}
 
 	// d^2 + 2d * sqrt(ra + b1^2) + ra + b1^2 = rb + (b - b1)^2 // good
