@@ -136,7 +136,7 @@ void Sample3DSceneRenderer::CreateDeviceDependentResources()
 		MMP::PointHeap pointHeap;
 		pointHeap.push_back({ 0, 0, 0 });
 		pointHeap.push_back({ 0, 0, -3 });
-		size_t circumferencePointCount = 8;
+		size_t circumferencePointCount = 10;
 		assert(circumferencePointCount % 2 == 0);
 		assert(circumferencePointCount > 2);
 		for (size_t i = 0; i < circumferencePointCount; ++i) {
